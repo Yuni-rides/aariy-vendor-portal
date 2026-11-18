@@ -1,10 +1,4 @@
-import { Parcel, PickupAddress } from "./orders.types";
-
-// TODO(api): replace with GET /seller/pickup-addresses
-export const PICKUP_ADDRESSES_MOCK: PickupAddress[] = [
-  { id: "addr-main", label: "Main store", address: "Plot 14, Block 5, Clifton", city: "Karachi", isDefault: true },
-  { id: "addr-warehouse", label: "Warehouse", address: "22 Industrial Estate, Kot Lakhpat", city: "Lahore" },
-];
+import { Parcel } from "./orders.types";
 
 const parcel = (p: Partial<Parcel> & Pick<Parcel, "id" | "parcelNumber" | "items" | "status" | "dispatchBy">): Parcel => ({
   buyerFirstName: "Ayesha",

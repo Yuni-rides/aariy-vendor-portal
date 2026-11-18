@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { toast } from "@/hooks/useToast";
 import { formatPKR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/features/auth/auth.store";
+import { useBrandProfileStore } from "@/features/brand-profile/brand-profile.store";
+import { payoutRequirements } from "@/features/brand-profile/brand-profile.helpers";
 import { formatLongDate } from "@/features/orders/orders.helpers";
 import {
   Btn,
@@ -32,14 +35,19 @@ import {
 import { downloadStatementPdf } from "../statements.pdf";
 
 export default function StatementsPage() {
-  const { statements, hold, loading, error, fetchStatements } = useStatementsStore();
+  const { statements, loading, error, fetchStatements } = useStatementsStore();
+  const profile = useBrandProfileStore((s) => s.profile);
+  const fetchProfile = useBrandProfileStore((s) => s.fetchProfile);
+  // TODO(api): the backend should return the hold reason with the statements.
+  const missing = payoutRequirements(profile);
   const user = useAuthStore((s) => s.user);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStatements();
-  }, [fetchStatements]);
+    fetchProfile();
+  }, [fetchStatements, fetchProfile]);
 
   const selected = statements.find((s) => s.id === selectedId) ?? statements[0] ?? null;
   const unpaid = nextUnpaid(statements);
@@ -60,12 +68,13 @@ export default function StatementsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader title="Statements" />
 
-      {hold?.onHold && (
+      {missing.length > 0 && (
         <Panel className="border-[#E8CC8A] bg-[#FFF1D6] text-sm">
-          <b>Payouts are on hold.</b> Add {missingText(hold.missing)} to receive
+          <b>Payouts are on hold.</b> Add {missingText(missing)} to receive
           {unpaid ? ` your ${monthName(unpaid)} payout` : " your payouts"}.{" "}
-          {/* TODO: link to /brand-profile once that module is built */}
-          <span className="text-muted-foreground">Go to Brand profile (coming soon)</span>
+          <Link href="/brand-profile" className="text-primary underline">
+            Go to Brand profile
+          </Link>
         </Panel>
       )}
 

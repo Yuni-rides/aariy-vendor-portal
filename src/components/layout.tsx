@@ -45,9 +45,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Stock", icon: Layers, href: "/stock", ready: true },
   { label: "Returns", icon: Undo2, href: "/returns", ready: true },
   { label: "Statements", icon: FileText, href: "/statements", ready: true },
-  // TODO: build these modules
-  { label: "Team", icon: Users, href: "/team" },
-  { label: "Brand profile", icon: Store, href: "/brand-profile" },
+  { label: "Team", icon: Users, href: "/team", ready: true },
+  { label: "Brand profile", icon: Store, href: "/brand-profile", ready: true },
 ];
 
 /* ---------------- SIDEBAR ---------------- */

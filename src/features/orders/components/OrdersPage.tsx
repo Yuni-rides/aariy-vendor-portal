@@ -22,6 +22,7 @@ import {
   Th,
   fieldClass,
 } from "@/shared/ui/seller";
+import { useBrandProfileStore } from "@/features/brand-profile/brand-profile.store";
 import { useOrdersStore } from "../orders.store";
 import { OrderResult, OrderTab, Parcel } from "../orders.types";
 import {
@@ -134,9 +135,17 @@ export default function OrdersPage() {
 /* ---------------- Detail ---------------- */
 
 function ParcelDetail({ parcel }: { parcel: Parcel }) {
-  const { pickupAddresses, saving, acceptParcel, rejectParcel, markReady } = useOrdersStore();
+  const { saving, acceptParcel, rejectParcel, markReady } = useOrdersStore();
+  const brandProfile = useBrandProfileStore((s) => s.profile);
+  const pickupAddresses = brandProfile?.addresses ?? [];
+  const fetchProfile = useBrandProfileStore((s) => s.fetchProfile);
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
   const defaultAddress = pickupAddresses.find((a) => a.isDefault) ?? pickupAddresses[0];
-  const [addressId, setAddressId] = useState(parcel.pickupAddressId ?? defaultAddress?.id ?? "");
+  const [chosenId, setAddressId] = useState<string | null>(parcel.pickupAddressId);
+  // Fall back to the default address until the seller picks one (addresses may load after mount).
+  const addressId = chosenId ?? defaultAddress?.id ?? "";
   const [confirmReject, setConfirmReject] = useState(false);
   const address = pickupAddresses.find((a) => a.id === (parcel.pickupAddressId ?? addressId));
 

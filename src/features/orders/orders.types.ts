@@ -20,13 +20,8 @@ export type ParcelItem = {
   price: number;
 };
 
-export type PickupAddress = {
-  id: string;
-  label: string;
-  address: string;
-  city: string;
-  isDefault?: boolean;
-};
+/** Pickup addresses are managed on the Brand profile page. */
+export type { PickupAddress } from "@/features/brand-profile/brand-profile.types";
 
 export type Parcel = {
   id: string;

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { PARCELS_MOCK, PICKUP_ADDRESSES_MOCK } from "./orders.mock";
-import { OrderResult, Parcel, ParcelStatus, PickupAddress } from "./orders.types";
+import { PARCELS_MOCK } from "./orders.mock";
+import { OrderResult, Parcel, ParcelStatus } from "./orders.types";
 
 type OrdersStore = {
   loading: boolean;
@@ -8,7 +8,6 @@ type OrdersStore = {
   error: string | null;
   loaded: boolean;
   parcels: Parcel[];
-  pickupAddresses: PickupAddress[];
 
   fetchParcels: () => Promise<void>;
   acceptParcel: (id: string, pickupAddressId: string) => Promise<OrderResult>;
@@ -53,16 +52,14 @@ export const useOrdersStore = create<OrdersStore>((set, get) => {
     error: null,
     loaded: false,
     parcels: [],
-    pickupAddresses: [],
 
     fetchParcels: async () => {
       if (get().loaded) return;
       set({ loading: true, error: null });
       try {
-        // TODO(api): const [parcels, addresses] = await Promise.all([ordersApi.list(), ordersApi.pickupAddresses()]);
+        // TODO(api): const res = await ordersApi.list();
         set({
           parcels: PARCELS_MOCK,
-          pickupAddresses: PICKUP_ADDRESSES_MOCK,
           loading: false,
           loaded: true,
         });

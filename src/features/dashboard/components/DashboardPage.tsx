@@ -16,6 +16,7 @@ import {
 } from "@/features/orders/orders.helpers";
 import { downloadParcelLabel } from "@/features/orders/orders.label";
 import { useProductsStore } from "@/features/products/products.store";
+import { useBrandProfileStore } from "@/features/brand-profile/brand-profile.store";
 import { alertText, lowStockAlerts } from "@/features/stock/stock.helpers";
 import { useStatementsStore } from "@/features/statements/statements.store";
 import { monthName, nextUnpaid } from "@/features/statements/statements.helpers";
@@ -43,7 +44,10 @@ const accountBadge = {
 
 export default function DashboardPage() {
   const { data, loading, error, fetchDashboard } = useDashboardStore();
-  const { parcels, pickupAddresses, loading: ordersLoading, saving, fetchParcels, acceptParcel } = useOrdersStore();
+  const { parcels, loading: ordersLoading, saving, fetchParcels, acceptParcel } = useOrdersStore();
+  const brandProfile = useBrandProfileStore((s) => s.profile);
+  const pickupAddresses = brandProfile?.addresses ?? [];
+  const fetchProfile = useBrandProfileStore((s) => s.fetchProfile);
   const { products, loading: productsLoading, fetchProducts } = useProductsStore();
   const { statements, loaded: statementsLoaded, fetchStatements } = useStatementsStore();
 
@@ -52,7 +56,8 @@ export default function DashboardPage() {
     fetchParcels();
     fetchProducts();
     fetchStatements();
-  }, [fetchDashboard, fetchParcels, fetchProducts, fetchStatements]);
+    fetchProfile();
+  }, [fetchDashboard, fetchParcels, fetchProducts, fetchStatements, fetchProfile]);
 
   const upcoming = nextUnpaid(statements);
 

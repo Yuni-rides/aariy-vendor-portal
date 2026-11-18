@@ -14,6 +14,8 @@ const PROTECTED_PREFIXES = [
   "/stock",
   "/returns",
   "/statements",
+  "/team",
+  "/brand-profile",
   "/tiers",
   "/settings",
   "/staff",

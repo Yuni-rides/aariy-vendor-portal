@@ -37,5 +37,4 @@ export type PayoutHold = {
 
 export type StatementsData = {
   statements: Statement[];
-  hold: PayoutHold;
 };

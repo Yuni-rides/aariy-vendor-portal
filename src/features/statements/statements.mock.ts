@@ -1,8 +1,7 @@
 import { StatementsData } from "./statements.types";
 
-// TODO(api): replace with GET /seller/statements and GET /seller/payout-status
+// TODO(api): replace with GET /seller/statements
 export const STATEMENTS_MOCK: StatementsData = {
-  hold: { onHold: true, missing: ["NTN", "VERIFIED_BANK_ACCOUNT"] },
   statements: [
     {
       id: "st-2026-10",
