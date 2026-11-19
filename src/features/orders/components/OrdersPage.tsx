@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { toast } from "@/hooks/useToast";
 import { formatPKR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   Btn,
   ChipTabs,
@@ -27,7 +28,13 @@ import { useOrdersStore } from "../orders.store";
 import { OrderResult, OrderTab, Parcel } from "../orders.types";
 import {
   ORDER_TABS,
+  DispatchErrors,
   commissionAmount,
+  effectiveDispatchDate,
+  formatDateTime,
+  toLocalInput,
+  validateDispatch,
+  validateDispatchDate,
   formatLongDate,
   formatShortDate,
   matchesTab,
@@ -71,7 +78,7 @@ export default function OrdersPage() {
     () =>
       parcels
         .filter((p) => matchesTab(p, tab))
-        .sort((a, b) => a.dispatchBy.localeCompare(b.dispatchBy)),
+        .sort((a, b) => effectiveDispatchDate(a).localeCompare(effectiveDispatchDate(b))),
     [parcels, tab],
   );
 
@@ -114,7 +121,7 @@ export default function OrdersPage() {
                 </StatusBadge>
               </div>
               <div className="text-[13px] font-normal text-muted-foreground">
-                {formatPKR(p.codAmount)} · dispatch by {formatShortDate(p.dispatchBy)}
+                {formatPKR(p.codAmount)} · dispatch by {formatShortDate(effectiveDispatchDate(p))}
               </div>
             </ListItem>
           ))}
@@ -147,6 +154,8 @@ function ParcelDetail({ parcel }: { parcel: Parcel }) {
   // Fall back to the default address until the seller picks one (addresses may load after mount).
   const addressId = chosenId ?? defaultAddress?.id ?? "";
   const [confirmReject, setConfirmReject] = useState(false);
+  const [dispatchDate, setDispatchDate] = useState(parcel.plannedDispatchDate ?? parcel.dispatchBy);
+  const dateError = parcel.status === "NEW" ? validateDispatchDate(parcel, dispatchDate) : null;
   const address = pickupAddresses.find((a) => a.id === (parcel.pickupAddressId ?? addressId));
 
   const notify = (res: OrderResult) =>
@@ -214,9 +223,28 @@ function ParcelDetail({ parcel }: { parcel: Parcel }) {
       <Panel className="flex flex-col gap-3">
         <PanelTitle className="mb-0">Dispatch</PanelTitle>
         <div className="flex flex-wrap gap-3">
-          <Field label="Dispatch by" htmlFor="d" className="min-w-[180px] flex-1">
-            <input id="d" className={fieldClass} value={formatLongDate(parcel.dispatchBy)} readOnly />
-          </Field>
+          {parcel.status === "NEW" ? (
+            <Field label="Dispatch date" htmlFor="d" error={dateError ?? undefined} className="min-w-[180px] flex-1">
+              <input
+                id="d"
+                type="date"
+                className={fieldClass}
+                value={dispatchDate}
+                max={parcel.dispatchBy}
+                min={parcel.confirmedAt.slice(0, 10)}
+                onChange={(e) => setDispatchDate(e.target.value)}
+              />
+              {!dateError && (
+                <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                  Promised to the buyer: by {formatLongDate(parcel.dispatchBy)}. You can pick an earlier day.
+                </p>
+              )}
+            </Field>
+          ) : (
+            <Field label="Dispatch date" htmlFor="d" className="min-w-[180px] flex-1">
+              <input id="d" className={fieldClass} value={formatLongDate(effectiveDispatchDate(parcel))} readOnly />
+            </Field>
+          )}
           <Field label="Courier picks up from" htmlFor="pa" className="min-w-[180px] flex-1">
             <select
               id="pa"
@@ -237,7 +265,11 @@ function ParcelDetail({ parcel }: { parcel: Parcel }) {
         {parcel.status === "NEW" && (
           <>
             <div className="flex flex-wrap gap-3">
-              <Btn primary disabled={saving} onClick={async () => notify(await acceptParcel(parcel.id, addressId))}>
+              <Btn
+                primary
+                disabled={saving || !!dateError}
+                onClick={async () => notify(await acceptParcel(parcel.id, addressId, dispatchDate))}
+              >
                 Accept order
               </Btn>
               <Btn disabled={saving} onClick={() => setConfirmReject(true)}>
@@ -266,18 +298,22 @@ function ParcelDetail({ parcel }: { parcel: Parcel }) {
         {parcel.status === "READY_FOR_PICKUP" && (
           <>
             <div className="flex flex-wrap gap-3">
-              <Btn primary onClick={handleLabel}>
-                Print label
-              </Btn>
+              <Btn onClick={handleLabel}>Print label</Btn>
             </div>
-            <Muted>The courier will collect the parcel from {address?.label ?? "your pickup address"}.</Muted>
+            <Muted>
+              The courier will collect the parcel from {address?.label ?? "your pickup address"}. When it leaves,
+              record the dispatch below.
+            </Muted>
+            <DispatchForm parcel={parcel} onDone={notify} />
           </>
         )}
 
         {(parcel.status === "PICKED_UP" || parcel.status === "DELIVERED") && (
           <Muted>
-            {parcel.status === "PICKED_UP" ? "Picked up by the courier." : "Delivered to the buyer."}
-            {parcel.trackingNumber && <> Tracking number: <b className="text-foreground">{parcel.trackingNumber}</b></>}
+            {parcel.status === "PICKED_UP" ? "Dispatched" : "Delivered to the buyer"}
+            {parcel.dispatchedAt && <> on {formatDateTime(parcel.dispatchedAt)}</>}.
+            {parcel.trackingNumber && <> Tracking number: <b className="text-foreground">{parcel.trackingNumber}</b>.</>}
+            {parcel.labelFileName && <> Label: {parcel.labelFileName}.</>}
           </Muted>
         )}
 
@@ -299,5 +335,69 @@ function ParcelDetail({ parcel }: { parcel: Parcel }) {
         }}
       />
     </>
+  );
+}
+
+/* ---------------- Record dispatch ---------------- */
+
+function DispatchForm({ parcel, onDone }: { parcel: Parcel; onDone: (res: OrderResult) => void }) {
+  const { saving, recordDispatch } = useOrdersStore();
+  const [tracking, setTracking] = useState("");
+  const [when, setWhen] = useState(() => toLocalInput(new Date()));
+  const [labelFile, setLabelFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<DispatchErrors>({});
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    // datetime-local has no zone; Date reads it as local time.
+    const dispatchedAt = when ? new Date(when).toISOString() : "";
+    const input = { trackingNumber: tracking, dispatchedAt, labelFileName: labelFile?.name ?? null };
+    const errs = validateDispatch(input);
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    // TODO(api): upload the label file to storage with the dispatch request.
+    onDone(await recordDispatch(parcel.id, input));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3 rounded-xl border border-border p-4">
+      <div className="text-sm font-semibold">Record dispatch</div>
+      <div className="flex flex-wrap gap-3">
+        <Field label="Tracking number" htmlFor="tn" error={errors.trackingNumber} className="min-w-[180px] flex-1">
+          <input
+            id="tn"
+            autoComplete="off"
+            className={fieldClass}
+            placeholder="e.g. LEO-88231904"
+            value={tracking}
+            onChange={(e) => setTracking(e.target.value)}
+          />
+        </Field>
+        <Field label="Dispatched at" htmlFor="dt" error={errors.dispatchedAt} className="min-w-[180px] flex-1">
+          <input
+            id="dt"
+            type="datetime-local"
+            className={fieldClass}
+            value={when}
+            max={toLocalInput(new Date())}
+            onChange={(e) => setWhen(e.target.value)}
+          />
+        </Field>
+      </div>
+      <Field label="Courier label (optional, if the courier gave you one)" htmlFor="lf">
+        <input
+          id="lf"
+          type="file"
+          accept="application/pdf,image/*"
+          className={cn(fieldClass, "py-2")}
+          onChange={(e) => setLabelFile(e.target.files?.[0] ?? null)}
+        />
+      </Field>
+      <div>
+        <Btn primary type="submit" disabled={saving}>
+          Save dispatch
+        </Btn>
+      </div>
+    </form>
   );
 }

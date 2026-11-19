@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { PARCELS_MOCK } from "./orders.mock";
-import { OrderResult, Parcel, ParcelStatus } from "./orders.types";
+import { DispatchInput, OrderResult, Parcel, ParcelStatus } from "./orders.types";
+import { validateDispatch, validateDispatchDate } from "./orders.helpers";
 
 type OrdersStore = {
   loading: boolean;
@@ -10,7 +11,8 @@ type OrdersStore = {
   parcels: Parcel[];
 
   fetchParcels: () => Promise<void>;
-  acceptParcel: (id: string, pickupAddressId: string) => Promise<OrderResult>;
+  acceptParcel: (id: string, pickupAddressId: string, dispatchDate: string) => Promise<OrderResult>;
+  recordDispatch: (id: string, input: DispatchInput) => Promise<OrderResult>;
   rejectParcel: (id: string) => Promise<OrderResult>;
   markReady: (id: string) => Promise<OrderResult>;
 };
@@ -68,11 +70,38 @@ export const useOrdersStore = create<OrdersStore>((set, get) => {
       }
     },
 
-    // TODO(api): POST /seller/parcels/:id/accept { pickupAddressId }
-    acceptParcel: (id, pickupAddressId) =>
+    // TODO(api): POST /seller/parcels/:id/accept { pickupAddressId, dispatchDate }
+    acceptParcel: (id, pickupAddressId, dispatchDate) =>
       run(() => {
         if (!pickupAddressId) return { success: false, message: "Choose a pickup address." };
-        return transition(id, ["NEW"], { status: "ACCEPTED", pickupAddressId }, "Order accepted. Pack it and mark it ready for pickup.");
+        const parcel = get().parcels.find((p) => p.id === id);
+        const dateError = parcel ? validateDispatchDate(parcel, dispatchDate) : null;
+        if (dateError) return { success: false, message: dateError };
+        return transition(
+          id,
+          ["NEW"],
+          { status: "ACCEPTED", pickupAddressId, plannedDispatchDate: dispatchDate },
+          "Order accepted. Pack it and mark it ready for pickup.",
+        );
+      }),
+
+    // TODO(api): POST /seller/parcels/:id/dispatch { trackingNumber, dispatchedAt, label }
+    recordDispatch: (id, input) =>
+      run(() => {
+        const errors = validateDispatch(input);
+        const first = Object.values(errors)[0];
+        if (first) return { success: false, message: first };
+        return transition(
+          id,
+          ["ACCEPTED", "READY_FOR_PICKUP"],
+          {
+            status: "PICKED_UP",
+            trackingNumber: input.trackingNumber.trim().toUpperCase(),
+            dispatchedAt: input.dispatchedAt,
+            labelFileName: input.labelFileName ?? null,
+          },
+          "Dispatch recorded. The buyer can now see the tracking number.",
+        );
       }),
 
     // TODO(api): POST /seller/parcels/:id/reject { reason: "OUT_OF_STOCK" }

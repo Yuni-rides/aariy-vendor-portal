@@ -34,6 +34,15 @@ import {
 const MAX_IMAGES = 8;
 const IMAGE_SLOTS = 4;
 
+/** Size chart columns (cm). Chest and length are required on submit. */
+const MEASURES: { key: "chest" | "waist" | "hip" | "length" | "sleeve"; label: string; optional?: boolean }[] = [
+  { key: "chest", label: "Chest" },
+  { key: "waist", label: "Waist", optional: true },
+  { key: "hip", label: "Hip", optional: true },
+  { key: "length", label: "Length" },
+  { key: "sleeve", label: "Sleeve", optional: true },
+];
+
 type VariantDraft = Omit<ProductVariant, "reserved">;
 
 const emptyForm = (): SaveProductPayload => ({
@@ -41,6 +50,7 @@ const emptyForm = (): SaveProductPayload => ({
   categoryId: "",
   description: "",
   material: "",
+  care: "",
   dispatchLeadTimeDays: 2,
   variants: [],
   images: [],
@@ -84,6 +94,7 @@ export default function ProductFormPage({ productId }: { productId?: string }) {
       categoryId: product.categoryId,
       description: product.description,
       material: product.material ?? "",
+      care: product.care ?? "",
       dispatchLeadTimeDays: product.dispatchLeadTimeDays,
       variants: product.variants,
       images: product.images,
@@ -259,6 +270,16 @@ export default function ProductFormPage({ productId }: { productId?: string }) {
                   />
                 </Field>
               </div>
+              <Field label="Care instructions" htmlFor="care" error={errors.care}>
+                <textarea
+                  id="care"
+                  rows={2}
+                  className={fieldClass}
+                  placeholder="Hand wash cold separately. Do not bleach. Iron on reverse."
+                  value={form.care ?? ""}
+                  onChange={(e) => patch({ care: e.target.value })}
+                />
+              </Field>
             </Panel>
 
             <Panel>
@@ -404,8 +425,12 @@ export default function ProductFormPage({ productId }: { productId?: string }) {
                 <thead>
                   <tr>
                     <Th>Size</Th>
-                    <Th>Chest</Th>
-                    <Th>Length</Th>
+                    {MEASURES.map((m) => (
+                      <Th key={m.key}>
+                        {m.label}
+                        {m.optional && <span className="font-normal"> (opt.)</span>}
+                      </Th>
+                    ))}
                     {!readOnly && <Th />}
                   </tr>
                 </thead>
@@ -415,12 +440,17 @@ export default function ProductFormPage({ productId }: { productId?: string }) {
                       <Td className="py-2">
                         <input aria-label="Size" className={cn(cellInput, "min-w-[56px]")} value={r.size} onChange={(e) => setChartRow(i, { size: e.target.value })} />
                       </Td>
-                      <Td className="py-2">
-                        <input aria-label="Chest" inputMode="decimal" className={cn(cellInput, "min-w-[56px]")} value={r.chest} onChange={(e) => setChartRow(i, { chest: e.target.value })} />
-                      </Td>
-                      <Td className="py-2">
-                        <input aria-label="Length" inputMode="decimal" className={cn(cellInput, "min-w-[56px]")} value={r.length} onChange={(e) => setChartRow(i, { length: e.target.value })} />
-                      </Td>
+                      {MEASURES.map((m) => (
+                        <Td key={m.key} className="py-2">
+                          <input
+                            aria-label={m.label}
+                            inputMode="decimal"
+                            className={cn(cellInput, "min-w-[56px]")}
+                            value={r[m.key] ?? ""}
+                            onChange={(e) => setChartRow(i, { [m.key]: e.target.value })}
+                          />
+                        </Td>
+                      ))}
                       {!readOnly && (
                         <Td className="py-2">
                           <button

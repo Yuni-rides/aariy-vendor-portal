@@ -29,6 +29,7 @@ import {
   businessTypeLabelMap,
   diffPublic,
   isValidNtn,
+  isValidStrn,
   maskedIban,
   publicFieldLabelMap,
   validatePublic,
@@ -36,13 +37,15 @@ import {
 } from "../brand-profile.helpers";
 import { AddressModal } from "./AddressModal";
 import { BankModal } from "./BankModal";
+import { KybDocumentsCard, KybDraft, emptyKybDraft, kybDraftCount } from "./KybDocumentsCard";
 
 const notify = (res: ProfileResult) => toast({ title: res.message, variant: res.success ? "default" : "destructive" });
 
 export default function BrandProfilePage() {
-  const { profile, loading, saving, error, fetchProfile, submitPublic } = useBrandProfileStore();
+  const { profile, loading, saving, error, fetchProfile, submitPublic, submitKyb } = useBrandProfileStore();
   const [draft, setDraft] = useState<PublicProfile | null>(null);
   const [errors, setErrors] = useState<PublicErrors>({});
+  const [kybDraft, setKybDraft] = useState<KybDraft>(emptyKybDraft);
 
   useEffect(() => {
     fetchProfile();
@@ -53,10 +56,24 @@ export default function BrandProfilePage() {
     if (profile && !draft) setDraft(withPending(profile));
   }, [profile, draft]);
 
-  const changed = useMemo(
-    () => (profile && draft ? Object.keys(diffPublic(withPending(profile), draft)).length > 0 : false),
+  // Number of public fields edited on this page, not yet sent.
+  const publicChanges = useMemo(
+    () => (profile && draft ? Object.keys(diffPublic(withPending(profile), draft)).length : 0),
     [profile, draft],
   );
+  const docChanges = kybDraftCount(kybDraft);
+  const unsaved = publicChanges + docChanges;
+
+  // Warn before leaving with changes that were never submitted.
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
 
   if (!profile || !draft) {
     return (
@@ -70,18 +87,48 @@ export default function BrandProfilePage() {
   const pendingFields = Object.keys(profile.pending?.values ?? {}) as PublicField[];
   const patch = (p: Partial<PublicProfile>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
+  /** One button sends everything changed on this page: public brand page edits and documents. */
   const handleSubmit = async () => {
-    const errs = validatePublic(draft);
-    setErrors(errs);
-    if (Object.keys(errs).length) return;
-    notify(await submitPublic(draft));
+    if (publicChanges) {
+      const errs = validatePublic(draft);
+      setErrors(errs);
+      if (Object.keys(errs).length) {
+        toast({ title: "Please fix the highlighted fields.", variant: "destructive" });
+        return;
+      }
+      const res = await submitPublic(draft);
+      if (!res.success) {
+        notify(res);
+        return;
+      }
+    }
+    if (docChanges) {
+      const res = await submitKyb(kybDraft);
+      if (!res.success) {
+        notify(res);
+        return;
+      }
+      setKybDraft(emptyKybDraft());
+    }
+    toast({
+      title: `${unsaved} change${unsaved > 1 ? "s" : ""} sent to Aariy for review`,
+      description: "You will get an email once they are checked.",
+    });
   };
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="Brand profile">
-        <Btn primary onClick={handleSubmit} disabled={saving || !changed}>
-          Submit changes
+        <span className={cn("text-[13px]", unsaved ? "text-[#8A5A00]" : "text-muted-foreground")}>
+          {unsaved ? `${unsaved} unsaved change${unsaved > 1 ? "s" : ""}` : "No unsaved changes"}
+        </span>
+        <Btn
+          primary
+          onClick={handleSubmit}
+          disabled={saving || !unsaved}
+          title={unsaved ? undefined : "Edit your brand page or documents first"}
+        >
+          {saving ? "Submitting..." : "Submit changes"}
         </Btn>
       </PageHeader>
 
@@ -94,6 +141,8 @@ export default function BrandProfilePage() {
         <AddressesCard addresses={profile.addresses} />
         <BankCard />
       </div>
+
+      <KybDocumentsCard draft={kybDraft} onChange={setKybDraft} />
     </div>
   );
 }
@@ -210,9 +259,15 @@ function LegalCard() {
         <br />
         Business type: {businessTypeLabelMap[legal.businessType]}
         <br />
+        Email: {legal.email}
+        <br />
+        Phone: {legal.phoneMasked}
+        <br />
         NTN: {legal.ntnMasked ?? <span className="text-[#8A5A00]">Not added</span>}
         <br />
-        CNIC: {legal.cnicMasked}
+        STRN: {legal.strnMasked ?? "Not registered for sales tax"}
+        <br />
+        CNIC / SSN: {legal.cnicMasked}
       </div>
       {!legal.ntnMasked && (
         <div className="flex flex-col gap-2">
@@ -235,7 +290,57 @@ function LegalCard() {
           <Muted>Once saved, the NTN is locked. Contact Aariy to change it.</Muted>
         </div>
       )}
+      {!legal.strnMasked && <StrnForm />}
     </Panel>
+  );
+}
+
+/** STRN is optional: only sellers registered for sales tax add it. */
+function StrnForm() {
+  const { saving, addStrn } = useBrandProfileStore();
+  const [open, setOpen] = useState(false);
+  const [strn, setStrn] = useState("");
+  const [err, setErr] = useState<string>();
+
+  if (!open) {
+    return (
+      <button type="button" className="cursor-pointer self-start text-[13px] text-primary hover:underline" onClick={() => setOpen(true)}>
+        Registered for sales tax? Add STRN
+      </button>
+    );
+  }
+
+  const handleSave = async () => {
+    if (!isValidStrn(strn)) {
+      setErr("Enter a valid 13-digit STRN.");
+      return;
+    }
+    setErr(undefined);
+    const res = await addStrn(strn);
+    notify(res);
+    if (res.success) setOpen(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Field label="STRN (sales tax registration number)" htmlFor="strn" error={err}>
+        <input
+          id="strn"
+          inputMode="numeric"
+          autoComplete="off"
+          className={fieldClass}
+          placeholder="17-00-1234-567-89"
+          value={strn}
+          onChange={(e) => setStrn(e.target.value)}
+        />
+      </Field>
+      <div className="flex gap-2">
+        <Btn onClick={handleSave} disabled={saving || !strn.trim()}>
+          Save STRN
+        </Btn>
+        <Btn onClick={() => setOpen(false)}>Cancel</Btn>
+      </div>
+    </div>
   );
 }
 

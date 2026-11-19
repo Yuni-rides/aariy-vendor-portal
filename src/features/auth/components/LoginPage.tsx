@@ -1,136 +1,84 @@
 "use client";
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
-import { useAuthStore } from "../auth.store";
+
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/hooks/useToast";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import Image from "next/image";
-import { requestForToken } from "@/lib/firebase";
+import { Btn, Field, fieldClass } from "@/shared/ui/seller";
+import { useAuthStore } from "../auth.store";
 import { AUTH_BYPASS } from "../auth.mock";
+import { canAccess, landingFor, sellerRoleOf, accountStatusOf } from "../seller-access";
+import { AuthShell, OtpStep } from "./AuthShell";
 
-const ALLOWED_ROLES = ["OWNER", "SUPER_ADMIN"];
-
-export default function Login() {
+export default function LoginPage() {
   const router = useRouter();
-  const { login, loading, error } = useAuthStore();
+  const redirect = useSearchParams().get("redirect");
+  const { otp, loading, requestLoginOtp, cancelOtp } = useAuthStore();
+  const [phone, setPhone] = useState("");
+  const [error, setError] = useState<string>();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // A code request from an earlier visit (e.g. the sign-up page) should not carry over.
+  useEffect(() => {
+    if (useAuthStore.getState().otp?.purpose !== "LOGIN") cancelOtp();
+  }, [cancelOtp]);
 
-  const handleLogin = async (e: FormEvent) => {
+  const handleSend = async (e: FormEvent) => {
     e.preventDefault();
+    const res = await requestLoginOtp(phone);
+    setError(res.success ? undefined : res.message);
+  };
 
-    const fcmToken = AUTH_BYPASS ? null : await requestForToken();
-
-    const response = await login({
-      email,
-      password,
-      fcmToken: fcmToken || undefined,
-    });
-
-    if (response.success) {
-      const roleCode = useAuthStore.getState().user?.role;
-
-      if (!roleCode || !ALLOWED_ROLES.includes(roleCode)) {
-        Cookies.remove("token");
-        localStorage.removeItem("auth-storage");
-        useAuthStore.setState({ user: null, accessToken: null });
-
-        toast({
-          variant: "destructive",
-          title: "Login failed",
-          description: "Invalid email or password.",
-        });
-        return;
-      }
-
-      toast({
-        title: "Login successful",
-        description: response.message,
-      });
-      router.push("/dashboard");
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: response.message,
-      });
-    }
+  const afterSignIn = () => {
+    const user = useAuthStore.getState().user;
+    toast({ title: "Signed in" });
+    const safeRedirect =
+      redirect && redirect.startsWith("/") && accountStatusOf(user) === "APPROVED" && canAccess(sellerRoleOf(user), redirect)
+        ? redirect
+        : null;
+    router.replace(safeRedirect ?? landingFor(user));
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-lg border-0">
-        <CardContent className="pt-10 pb-10 px-8 flex flex-col items-center">
-          <div className="mb-6">
-            <Image
-              src="/logo.png"
-              alt="Logo"
-              width={140}
-              height={40}
-              priority
-              className="object-contain"
+    <AuthShell
+      title={otp ? "Check your phone" : "Sign in"}
+      subtitle={otp ? undefined : "Brand owners and team members sign in with a one-time code."}
+    >
+      {otp ? (
+        <OtpStep onVerified={afterSignIn} />
+      ) : (
+        <form onSubmit={handleSend} noValidate className="flex flex-col gap-4">
+          <Field label="Mobile number" htmlFor="phone" error={error}>
+            <input
+              id="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              className={fieldClass}
+              placeholder="0300 1234567"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setError(undefined);
+              }}
             />
-          </div>
-          <div className="mb-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Welcome Back
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Please log in to continue
+          </Field>
+          {AUTH_BYPASS && (
+            <p className="m-0 rounded-[10px] bg-secondary px-3 py-2 text-xs text-muted-foreground">
+              Test mode: any number signs in as the brand owner. 0300 0000001 / 002 / 003 sign in as Manager,
+              Catalogue or Orders.
             </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="w-full space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="sr-only">
-                Email
-              </Label>
-              <Input
-                id="email"
-                placeholder="Enter your email"
-                className="h-11 bg-white"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="sr-only">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                className="h-11 bg-white"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            {AUTH_BYPASS && (
-              <p className="rounded-md bg-accent px-3 py-2 text-center text-xs text-muted-foreground">
-                Test mode: any email and password will log you in.
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 text-base font-medium mt-2 bg-primary hover:bg-primary/90 cursor-pointer"
-            >
-              {loading ? "Logging in..." : "Log In"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          )}
+          <Btn primary type="submit" disabled={loading}>
+            {loading ? "Sending..." : "Send code"}
+          </Btn>
+          <p className="m-0 text-center text-[13px] text-muted-foreground">
+            New to Aariy?{" "}
+            <Link href="/register" className="text-primary hover:underline">
+              Create a seller account
+            </Link>
+          </p>
+        </form>
+      )}
+    </AuthShell>
   );
 }

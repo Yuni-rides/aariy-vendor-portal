@@ -21,16 +21,7 @@ export const memberStatusToneMap: Record<MemberStatus, StatusTone> = {
   INVITED: "warning",
 };
 
-/**
- * Which portal sections each role can open. Owner sees everything.
- * TODO: use this to hide nav items and guard routes once the API returns the user's seller role.
- */
-export const ROLE_ACCESS: Record<TeamRole, string[] | "ALL"> = {
-  OWNER: "ALL",
-  MANAGER: ["/dashboard", "/orders", "/products", "/stock", "/returns", "/statements", "/brand-profile"],
-  CATALOGUE: ["/products", "/stock"],
-  ORDERS: ["/orders", "/returns"],
-};
+/** Route access per role lives in features/auth/seller-access.ts. */
 
 export const ROLE_DESCRIPTIONS = "Manager: everything except Team. Catalogue: Products and Stock. Orders: Orders and Returns.";
 

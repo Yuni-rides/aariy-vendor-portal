@@ -77,7 +77,8 @@ export default function DashboardPage() {
   const defaultAddress = pickupAddresses.find((a) => a.isDefault) ?? pickupAddresses[0];
 
   const handleAccept = async (p: Parcel) => {
-    const res = await acceptParcel(p.id, defaultAddress?.id ?? "");
+    // Quick accept keeps the promised dispatch date; it can be set earlier on the order page.
+    const res = await acceptParcel(p.id, defaultAddress?.id ?? "", p.dispatchBy);
     toast({ title: res.message, variant: res.success ? "default" : "destructive" });
   };
 

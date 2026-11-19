@@ -13,9 +13,9 @@ import {
 export const STOREFRONT_BRAND_URL = "aariy.pk/brands/";
 
 export const businessTypeLabelMap: Record<BusinessType, string> = {
-  COMPANY: "Company",
   SOLE_PROPRIETOR: "Sole proprietor",
-  PARTNERSHIP: "Partnership",
+  AOP: "AOP (partnership)",
+  COMPANY: "Company",
 };
 
 export const publicFieldLabelMap: Record<PublicField, string> = {
@@ -103,6 +103,11 @@ export const normaliseIban = (v: string) => v.replace(/\s/g, "").toUpperCase();
 export const isValidIban = (v: string) => /^PK\d{2}[A-Z]{4}\d{16}$/.test(normaliseIban(v));
 
 export const maskedIban = (last4: string) => `PK•• •••• •••• ${last4}`;
+
+/** STRN: 13 digits, often written with dashes, e.g. 17-00-1234-567-89. */
+export const normaliseStrn = (v: string) => v.replace(/[\s-]/g, "");
+export const isValidStrn = (v: string) => /^\d{13}$/.test(normaliseStrn(v));
+export const maskStrn = (v: string) => `•••••••••${normaliseStrn(v).slice(-4)}`;
 
 export type BankErrors = Partial<Record<keyof BankInput, string>>;
 

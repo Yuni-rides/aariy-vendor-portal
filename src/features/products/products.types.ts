@@ -16,10 +16,14 @@ export type ProductVariant = {
   reserved: number;
 };
 
+/** Measurements in cm. Chest and length are required; the rest are optional. */
 export type SizeChartRow = {
   size: string;
   chest: string;
+  waist?: string;
+  hip?: string;
   length: string;
+  sleeve?: string;
 };
 
 export type Product = {
@@ -29,6 +33,8 @@ export type Product = {
   categoryName: string;
   description: string;
   material?: string;
+  /** Washing and care instructions shown on the product page. */
+  care?: string;
   dispatchLeadTimeDays: number;
   variants: ProductVariant[];
   images: string[];

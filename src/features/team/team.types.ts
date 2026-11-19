@@ -1,4 +1,6 @@
-export type TeamRole = "OWNER" | "MANAGER" | "CATALOGUE" | "ORDERS";
+import type { SellerRole } from "@/features/auth/auth.types";
+
+export type TeamRole = SellerRole;
 
 /** Roles the owner can give when inviting (there is only one owner). */
 export type InviteRole = Exclude<TeamRole, "OWNER">;

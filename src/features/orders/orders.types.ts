@@ -30,8 +30,14 @@ export type Parcel = {
   buyerCity: string;
   /** When the Aariy CSR confirmed the order with the buyer. */
   confirmedAt: string;
-  /** Date the parcel must be ready for the courier (ISO date). */
+  /** Latest dispatch date promised to the buyer (ISO date). */
   dispatchBy: string;
+  /** Dispatch date the seller set when accepting (ISO date), on or before dispatchBy. */
+  plannedDispatchDate?: string | null;
+  /** When the parcel actually left (ISO date-time), recorded by the seller. */
+  dispatchedAt?: string | null;
+  /** Courier label the seller uploaded, if any. */
+  labelFileName?: string | null;
   items: ParcelItem[];
   /** Amount the courier collects for this parcel (cash on delivery). */
   codAmount: number;
@@ -47,3 +53,10 @@ export type Parcel = {
 export type OrderTab = "NEW" | "TO_PACK" | "PICKED_UP" | "DELIVERED" | "CANCELLED";
 
 export type OrderResult = { success: boolean; message: string };
+
+export type DispatchInput = {
+  trackingNumber: string;
+  /** ISO date-time. */
+  dispatchedAt: string;
+  labelFileName?: string | null;
+};

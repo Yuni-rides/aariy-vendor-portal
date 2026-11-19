@@ -36,7 +36,7 @@ export const rowActionLabel = (p: Product) => {
   return "Edit";
 };
 
-export type ProductFormErrors = Partial<Record<"name" | "categoryId" | "variants" | "sizeChart", string>>;
+export type ProductFormErrors = Partial<Record<"name" | "categoryId" | "care" | "variants" | "sizeChart", string>>;
 
 /** Drafts only need a name; submitting needs everything Aariy staff check. */
 export function validateProduct(payload: SaveProductPayload, mode: SaveMode): ProductFormErrors {
@@ -45,6 +45,7 @@ export function validateProduct(payload: SaveProductPayload, mode: SaveMode): Pr
   if (mode === "DRAFT") return errors;
 
   if (!payload.categoryId) errors.categoryId = "Pick a category.";
+  if (!payload.care?.trim()) errors.care = "Add care instructions, e.g. Hand wash cold, do not bleach.";
 
   if (payload.variants.length === 0) {
     errors.variants = "Add at least one variant.";

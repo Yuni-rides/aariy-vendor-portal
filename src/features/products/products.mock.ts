@@ -22,6 +22,7 @@ export const PRODUCTS_MOCK: Product[] = [
     categoryName: "Kurta set",
     description: "Three-piece lawn suit with embroidered neckline.",
     material: "Lawn",
+    care: "Hand wash cold separately. Do not bleach. Iron on reverse.",
     dispatchLeadTimeDays: 2,
     variants: [
       { id: "v-l3-s", size: "S", colour: "Teal", sku: "MB-L3-S-TL", barcode: "8961234500011", price: 5000, stock: 4, reserved: 0 },
@@ -41,6 +42,7 @@ export const PRODUCTS_MOCK: Product[] = [
     categoryName: "Maxi",
     description: "Flowing chiffon maxi with hand-finished sleeves.",
     material: "Chiffon",
+    care: "Dry clean only.",
     dispatchLeadTimeDays: 3,
     variants: [
       { id: "v-cm-xs", size: "XS", colour: "Rose", sku: "MB-CM-XS", price: 5700, stock: 4, reserved: 0 },
@@ -61,6 +63,7 @@ export const PRODUCTS_MOCK: Product[] = [
     categoryName: "Pishwas",
     description: "Printed pishwas with flared panels.",
     material: "Cotton",
+    care: "Machine wash cold, gentle cycle. Dry in shade.",
     dispatchLeadTimeDays: 2,
     variants: [
       { id: "v-pw-s", size: "S", colour: "Mustard", sku: "MB-PW-S", price: 6400, stock: 5, reserved: 0 },
@@ -79,6 +82,7 @@ export const PRODUCTS_MOCK: Product[] = [
     categoryName: "Kurta set",
     description: "Two-piece cotton kurta set.",
     material: "Cotton",
+    care: "Machine wash cold, gentle cycle. Dry in shade.",
     dispatchLeadTimeDays: 2,
     variants: [
       { id: "v-ks-m", size: "M", colour: "White", sku: "MB-KS-M", price: 4200, stock: 5, reserved: 1 },
@@ -97,6 +101,7 @@ export const PRODUCTS_MOCK: Product[] = [
     categoryName: "Sharara",
     description: "Cotton sharara set with dupatta.",
     material: "Cotton",
+    care: "Machine wash cold, gentle cycle. Dry in shade.",
     dispatchLeadTimeDays: 3,
     variants: [
       { id: "v-sh-s", size: "S", colour: "Peach", sku: "MB-SH-S", price: 6900, stock: 0, reserved: 0 },

@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { BRAND_PROFILE_MOCK } from "./brand-profile.mock";
+import type { DocKey, UploadedDoc } from "@/features/onboarding/onboarding.types";
+import { MAX_OTHER_DOCS } from "@/features/onboarding/onboarding.helpers";
 import {
   AddressInput,
   BankInput,
@@ -11,7 +13,9 @@ import {
 import {
   diffPublic,
   isValidNtn,
+  isValidStrn,
   maskNtn,
+  maskStrn,
   normaliseIban,
   normaliseNtn,
   validateAddress,
@@ -30,10 +34,17 @@ type BrandProfileStore = {
   fetchProfile: () => Promise<void>;
   submitPublic: (draft: PublicProfile) => Promise<ProfileResult>;
   addNtn: (ntn: string) => Promise<ProfileResult>;
+  addStrn: (strn: string) => Promise<ProfileResult>;
   saveAddress: (id: string | null, input: AddressInput) => Promise<ProfileResult>;
   setDefaultAddress: (id: string) => Promise<ProfileResult>;
   removeAddress: (id: string, inUse: boolean) => Promise<ProfileResult>;
   changeBank: (input: BankInput) => Promise<ProfileResult>;
+  /** Sends the document changes staged on the Brand profile page. */
+  submitKyb: (changes: {
+    docs: Partial<Record<DocKey, UploadedDoc>>;
+    others: { label: string; file: UploadedDoc }[];
+  }) => Promise<ProfileResult>;
+  removeOtherKybDoc: (id: string) => Promise<ProfileResult>;
 };
 
 const ok = (message: string): ProfileResult => ({ success: true, message });
@@ -96,6 +107,15 @@ export const useBrandProfileStore = create<BrandProfileStore>((set, get) => {
         return ok("NTN saved.");
       }),
 
+    // TODO(api): POST /seller/profile/strn { strn }  (optional, allowed once, then locked)
+    addStrn: (strn) =>
+      run((p) => {
+        if (p.legal.strnMasked) return no("STRN is already on file. Contact Aariy to change it.");
+        if (!isValidStrn(strn)) return no("Enter a valid 13-digit STRN.");
+        update({ legal: { ...p.legal, strnMasked: maskStrn(strn) } });
+        return ok("STRN saved.");
+      }),
+
     // TODO(api): POST /seller/pickup-addresses or PATCH /seller/pickup-addresses/:id
     saveAddress: (id, input) =>
       run((p) => {
@@ -132,6 +152,37 @@ export const useBrandProfileStore = create<BrandProfileStore>((set, get) => {
         if (inUse) return no("Parcels waiting for pickup use this address. Remove it after they are collected.");
         update({ addresses: p.addresses.filter((x) => x.id !== id) });
         return ok("Address removed.");
+      }),
+
+    // TODO(api): upload files to private storage, then POST /v1/seller/kyb-documents { docs, others }.
+    // Everything sent goes back to Aariy review.
+    submitKyb: (changes) =>
+      run((p) => {
+        const docKeys = Object.keys(changes.docs) as DocKey[];
+        if (!docKeys.length && !changes.others.length) return no("No document changes to submit.");
+        if (changes.others.some((o) => !o.label.trim())) return no("Every other document needs a name.");
+        if (p.kyb.others.length + changes.others.length > MAX_OTHER_DOCS)
+          return no(`You can have up to ${MAX_OTHER_DOCS} other documents.`);
+        const documents = { ...p.kyb.documents };
+        docKeys.forEach((k) => {
+          documents[k] = { ...changes.docs[k]!, status: "IN_REVIEW", note: null };
+        });
+        const others = [
+          ...p.kyb.others,
+          ...changes.others.map((o, i) => ({ ...o.file, id: `od-${Date.now()}-${i}`, label: o.label.trim(), status: "IN_REVIEW" as const })),
+        ];
+        update({ kyb: { documents, others } });
+        return ok("Documents sent to Aariy for review.");
+      }),
+
+    // TODO(api): DELETE /v1/seller/kyb-documents/other/:id
+    removeOtherKybDoc: (id) =>
+      run((p) => {
+        const doc = p.kyb.others.find((o) => o.id === id);
+        if (!doc) return no("Document not found");
+        if (doc.status === "APPROVED") return no("Approved documents stay on file. Contact Aariy to remove one.");
+        update({ kyb: { ...p.kyb, others: p.kyb.others.filter((o) => o.id !== id) } });
+        return ok("Document removed.");
       }),
 
     // TODO(api): PUT /seller/bank-account { bankName, accountTitle, iban }

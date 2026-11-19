@@ -20,7 +20,10 @@ export const BRAND_PROFILE_MOCK: BrandProfile = {
     legalName: "MB Fashions (Pvt) Ltd",
     businessType: "COMPANY",
     ntnMasked: null,
+    strnMasked: null,
     cnicMasked: "•••••-•••••••-•",
+    email: "owner@brand.pk",
+    phoneMasked: "+92 3•• •••4567",
   },
   addresses: [
     {
@@ -41,6 +44,31 @@ export const BRAND_PROFILE_MOCK: BrandProfile = {
       phone: "0321 7654321",
     },
   ],
+  kyb: {
+    documents: {
+      CNIC_FRONT: { name: "cnic-front.jpg", size: 412000, type: "image/jpeg", uploadedAt: "2026-10-02T10:00:00Z", status: "APPROVED" },
+      CNIC_BACK: { name: "cnic-back.jpg", size: 398000, type: "image/jpeg", uploadedAt: "2026-10-02T10:00:00Z", status: "APPROVED" },
+      BANK_PROOF: {
+        name: "meezan-cheque.pdf",
+        size: 220000,
+        type: "application/pdf",
+        uploadedAt: "2026-10-02T10:00:00Z",
+        status: "REJECTED",
+        note: "IBAN is not readable. Upload a clearer copy.",
+      },
+    },
+    others: [
+      {
+        id: "od-trademark",
+        label: "Trademark certificate",
+        name: "ipo-trademark.pdf",
+        size: 640000,
+        type: "application/pdf",
+        uploadedAt: "2026-10-02T10:00:00Z",
+        status: "APPROVED",
+      },
+    ],
+  },
   bank: {
     bankName: "Meezan Bank",
     accountTitle: "MB Fashions (Pvt) Ltd",

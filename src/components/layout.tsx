@@ -11,6 +11,7 @@ import {
   FileText,
   Users,
   Store,
+  KeyRound,
   Menu,
   User,
   LogOut,
@@ -30,6 +31,8 @@ import {
 import { useAuthStore } from "@/features/auth/auth.store";
 import { requestForToken } from "@/lib/firebase";
 import { AUTH_BYPASS } from "@/features/auth/auth.mock";
+import { canAccess, sellerRoleOf } from "@/features/auth/seller-access";
+import { SellerGate } from "@/components/SellerGate";
 
 type NavItem = {
   label: string;
@@ -39,7 +42,12 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", ready: true },
+  {
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/dashboard",
+    ready: true,
+  },
   { label: "Orders", icon: ShoppingBag, href: "/orders", ready: true },
   { label: "Products", icon: Package, href: "/products", ready: true },
   { label: "Stock", icon: Layers, href: "/stock", ready: true },
@@ -47,9 +55,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Statements", icon: FileText, href: "/statements", ready: true },
   { label: "Team", icon: Users, href: "/team", ready: true },
   { label: "Brand profile", icon: Store, href: "/brand-profile", ready: true },
+  // { label: "API keys", icon: KeyRound, href: "/api-keys", ready: true },
 ];
-
-/* ---------------- SIDEBAR ---------------- */
 
 export function Sidebar({
   className,
@@ -59,6 +66,8 @@ export function Sidebar({
   onClose?: () => void;
 }) {
   const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
+  const role = sellerRoleOf(user);
 
   return (
     <div
@@ -69,13 +78,11 @@ export function Sidebar({
     >
       <div className="px-2.5">
         <div className="text-[22px] font-semibold leading-tight">Aariy</div>
-        <div className="pb-4 text-xs text-muted-foreground">
-          Seller portal
-        </div>
+        <div className="pb-4 text-xs text-muted-foreground">Seller portal</div>
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => canAccess(role, item.href)).map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
 
@@ -86,7 +93,8 @@ export function Sidebar({
                 isActive
                   ? "bg-accent font-semibold text-foreground"
                   : "text-sidebar-foreground hover:bg-muted",
-                !item.ready && "cursor-not-allowed opacity-50 hover:bg-transparent",
+                !item.ready &&
+                  "cursor-not-allowed opacity-50 hover:bg-transparent",
               )}
             >
               <item.icon className="h-[18px] w-[18px]" />
@@ -117,8 +125,6 @@ export function Sidebar({
     </div>
   );
 }
-
-/* ---------------- HEADER ---------------- */
 
 export function Header() {
   const router = useRouter();
@@ -183,15 +189,18 @@ export function Header() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => router.push("/profile")}
-          >
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
+          {canAccess(sellerRoleOf(user), "/brand-profile") && (
+            <>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => router.push("/brand-profile")}
+              >
+                <User className="mr-2 h-4 w-4" />
+                <span>Brand profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
 
           <DropdownMenuItem
             onClick={handleLogout}
@@ -206,8 +215,6 @@ export function Header() {
   );
 }
 
-/* ---------------- APP LAYOUT ---------------- */
-
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
@@ -217,7 +224,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col lg:pl-[232px]">
         <Header />
         <main className="min-w-0 flex-1 overflow-auto p-4 sm:px-8 sm:py-6">
-          {children}
+          <SellerGate>{children}</SellerGate>
         </main>
       </div>
     </div>
