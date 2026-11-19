@@ -104,18 +104,17 @@ export type SetPasswordResponse = {
   message: string;
 };
 
-/* ---------------- Seller one-time code sign-in (SOW 4.1, 19.5) ---------------- */
+/* ---------------- Seller sign-up (email + password) ---------------- */
 
 export type RegisterDto = {
   fullName: string;
-  /** Pakistani mobile in E.164, e.g. +923001234567. */
-  phone: string;
   email: string;
+  password: string;
+  /** Business contact number in E.164, e.g. +923001234567. Not used to sign in. */
+  phone: string;
   brandName: string;
-  /** Accepted buyer/seller terms and privacy policy. Recorded with the time by the API. */
+  /** Accepted seller terms and privacy policy. Recorded with the time by the API. */
   consent: boolean;
 };
-
-export type OtpPurpose = "LOGIN" | "REGISTER";
 
 export type AuthResult = { success: boolean; message: string };

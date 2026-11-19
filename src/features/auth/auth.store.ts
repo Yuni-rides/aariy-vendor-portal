@@ -2,30 +2,18 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import Cookies from "js-cookie";
 import { authApi } from "./auth.api";
-import { AuthResult, AuthUser, OtpPurpose, RegisterDto, SetPasswordDto } from "./auth.types";
-import { AUTH_BYPASS, MOCK_ACCESS_TOKEN, MOCK_OTP, buildMockUser } from "./auth.mock";
-import { OTP_LENGTH, isValidEmailAddress, isValidPkMobile, toE164 } from "./auth.helpers";
-
-/** A code request in progress: which number, why, and the sign-up details if any. */
-type OtpSession = {
-  phone: string;
-  purpose: OtpPurpose;
-  registration?: RegisterDto;
-  sentAt: number;
-};
+import { AuthResult, AuthUser, LoginDto, RegisterDto, SetPasswordDto } from "./auth.types";
+import { AUTH_BYPASS, MOCK_ACCESS_TOKEN, buildMockUser } from "./auth.mock";
+import { isValidEmailAddress, isValidPkMobile, passwordProblem, toE164 } from "./auth.helpers";
 
 type AuthStore = {
   user: AuthUser | null;
   accessToken: string | null;
   loading: boolean;
   error: string | null;
-  otp: OtpSession | null;
 
-  requestLoginOtp: (phone: string) => Promise<AuthResult>;
-  requestRegisterOtp: (dto: RegisterDto) => Promise<AuthResult>;
-  resendOtp: () => Promise<AuthResult>;
-  verifyOtp: (code: string) => Promise<AuthResult>;
-  cancelOtp: () => void;
+  login: (dto: LoginDto) => Promise<AuthResult>;
+  register: (dto: RegisterDto) => Promise<AuthResult>;
   /** Local update after a change the API confirmed (e.g. onboarding submitted). */
   patchUser: (patch: Partial<AuthUser>) => void;
   logout: (fcmToken: string) => Promise<void>;
@@ -41,129 +29,116 @@ const startSession = (token: string, user: AuthUser) => {
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set, get) => {
-      const send = async (session: Omit<OtpSession, "sentAt">): Promise<AuthResult> => {
+    (set, get) => ({
+      user: null,
+      accessToken: null,
+      loading: false,
+      error: null,
+
+      login: async (dto) => {
+        const email = dto.email.trim().toLowerCase();
+        if (!isValidEmailAddress(email)) return { success: false, message: "Enter a valid email address." };
+        if (!dto.password) return { success: false, message: "Enter your password." };
         set({ loading: true, error: null });
+
+        // TEMPORARY: any email + password signs in until the auth API is ready.
+        if (AUTH_BYPASS) {
+          set({ ...startSession(MOCK_ACCESS_TOKEN, buildMockUser({ email })), loading: false });
+          return { success: true, message: "Signed in (test mode)." };
+        }
+
         try {
-          if (!AUTH_BYPASS) {
-            const res = await authApi.requestOtp(session);
-            if (!res.status) {
-              set({ loading: false, error: res.message });
-              return { success: false, message: res.message };
-            }
+          const res = await authApi.login({ ...dto, email });
+          if (!res.status || !res.data) {
+            const msg = res.message ?? "Wrong email or password.";
+            set({ loading: false, error: msg });
+            return { success: false, message: msg };
           }
-          set({ otp: { ...session, sentAt: Date.now() }, loading: false });
-          return { success: true, message: "We sent a 6-digit code by SMS." };
+          set({ ...startSession(res.data.accessToken, res.data.user), loading: false });
+          return { success: true, message: res.message };
         } catch (e: any) {
-          const msg = message(e, "Could not send the code. Try again.");
+          const msg = message(e, "Wrong email or password.");
           set({ loading: false, error: msg });
           return { success: false, message: msg };
         }
-      };
+      },
 
-      return {
-        user: null,
-        accessToken: null,
-        loading: false,
-        error: null,
-        otp: null,
+      register: async (dto) => {
+        if (!dto.fullName.trim()) return { success: false, message: "Enter your full name." };
+        if (!isValidEmailAddress(dto.email)) return { success: false, message: "Enter a valid email address." };
+        const pw = passwordProblem(dto.password);
+        if (pw) return { success: false, message: pw };
+        if (!isValidPkMobile(dto.phone)) return { success: false, message: "Enter a mobile number like 0300 1234567." };
+        if (!dto.brandName.trim()) return { success: false, message: "Enter your brand name." };
+        if (!dto.consent) return { success: false, message: "Accept the terms and privacy policy to continue." };
 
-        requestLoginOtp: async (rawPhone) => {
-          if (!isValidPkMobile(rawPhone)) return { success: false, message: "Enter a mobile number like 0300 1234567." };
-          return send({ phone: toE164(rawPhone), purpose: "LOGIN" });
-        },
+        const payload: RegisterDto = {
+          ...dto,
+          fullName: dto.fullName.trim(),
+          email: dto.email.trim().toLowerCase(),
+          phone: toE164(dto.phone),
+          brandName: dto.brandName.trim(),
+        };
+        set({ loading: true, error: null });
 
-        requestRegisterOtp: async (dto) => {
-          if (!dto.fullName.trim()) return { success: false, message: "Enter your full name." };
-          if (!isValidPkMobile(dto.phone)) return { success: false, message: "Enter a mobile number like 0300 1234567." };
-          if (!isValidEmailAddress(dto.email)) return { success: false, message: "Enter a valid email address." };
-          if (!dto.brandName.trim()) return { success: false, message: "Enter your brand name." };
-          if (!dto.consent) return { success: false, message: "Accept the terms and privacy policy to continue." };
-          const registration = { ...dto, phone: toE164(dto.phone), email: dto.email.trim().toLowerCase() };
-          return send({ phone: registration.phone, purpose: "REGISTER", registration });
-        },
+        if (AUTH_BYPASS) {
+          const user = buildMockUser({
+            email: payload.email,
+            role: "OWNER",
+            accountStatus: "ONBOARDING",
+            fullName: payload.fullName,
+            phone: payload.phone,
+          });
+          set({ ...startSession(MOCK_ACCESS_TOKEN, user), loading: false });
+          return { success: true, message: "Account created." };
+        }
 
-        resendOtp: async () => {
-          const otp = get().otp;
-          if (!otp) return { success: false, message: "Start again with your mobile number." };
-          return send({ phone: otp.phone, purpose: otp.purpose, registration: otp.registration });
-        },
-
-        verifyOtp: async (code) => {
-          const otp = get().otp;
-          if (!otp) return { success: false, message: "Start again with your mobile number." };
-          if (!new RegExp(`^\\d{${OTP_LENGTH}}$`).test(code)) return { success: false, message: "Enter the 6-digit code." };
-          set({ loading: true, error: null });
-
-          if (AUTH_BYPASS) {
-            if (code !== MOCK_OTP) {
-              set({ loading: false });
-              return { success: false, message: "That code is not right. Check the SMS and try again." };
-            }
-            const user = buildMockUser(
-              otp.purpose === "REGISTER"
-                ? {
-                    phone: otp.phone,
-                    role: "OWNER",
-                    accountStatus: "ONBOARDING",
-                    fullName: otp.registration?.fullName,
-                    email: otp.registration?.email,
-                  }
-                : { phone: otp.phone },
-            );
-            set({ ...startSession(MOCK_ACCESS_TOKEN, user), otp: null, loading: false });
-            return { success: true, message: otp.purpose === "REGISTER" ? "Account created." : "Signed in." };
+        try {
+          const res = await authApi.register(payload);
+          if (!res.status || !res.data) {
+            set({ loading: false, error: res.message });
+            return { success: false, message: res.message ?? "Could not create the account." };
           }
+          set({ ...startSession(res.data.accessToken, res.data.user), loading: false });
+          return { success: true, message: res.message };
+        } catch (e: any) {
+          const msg = message(e, "Could not create the account. Try again.");
+          set({ loading: false, error: msg });
+          return { success: false, message: msg };
+        }
+      },
 
-          try {
-            const res = await authApi.verifyOtp({ phone: otp.phone, code, purpose: otp.purpose });
-            if (!res.status || !res.data) {
-              set({ loading: false });
-              return { success: false, message: res.message ?? "That code is not right." };
-            }
-            set({ ...startSession(res.data.accessToken, res.data.user), otp: null, loading: false });
-            return { success: true, message: res.message };
-          } catch (e: any) {
-            const msg = message(e, "Could not check the code. Try again.");
-            set({ loading: false, error: msg });
-            return { success: false, message: msg };
-          }
-        },
+      patchUser: (patch) => {
+        const user = get().user;
+        if (user) set({ user: { ...user, ...patch } });
+      },
 
-        cancelOtp: () => set({ otp: null, error: null }),
+      logout: async (fcmToken: string) => {
+        try {
+          if (!AUTH_BYPASS) await authApi.logout({ fcmToken });
+        } catch (error) {
+          console.error("Logout API failed", error);
+        } finally {
+          Cookies.remove("token");
+          localStorage.removeItem("auth-storage");
+          set({ user: null, accessToken: null });
+          window.location.href = "/login";
+        }
+      },
 
-        patchUser: (patch) => {
-          const user = get().user;
-          if (user) set({ user: { ...user, ...patch } });
-        },
-
-        logout: async (fcmToken: string) => {
-          try {
-            if (!AUTH_BYPASS) await authApi.logout({ fcmToken });
-          } catch (error) {
-            console.error("Logout API failed", error);
-          } finally {
-            Cookies.remove("token");
-            localStorage.removeItem("auth-storage");
-            set({ user: null, accessToken: null, otp: null });
-            window.location.href = "/login";
-          }
-        },
-
-        setPassword: async (dto) => {
-          set({ loading: true, error: null });
-          try {
-            const res = await authApi.setPassword(dto);
-            set({ loading: false });
-            return { success: res.status, message: res.message };
-          } catch (e: any) {
-            const msg = message(e, "Failed to set password");
-            set({ loading: false, error: msg });
-            return { success: false, message: msg };
-          }
-        },
-      };
-    },
+      setPassword: async (dto) => {
+        set({ loading: true, error: null });
+        try {
+          const res = await authApi.setPassword(dto);
+          set({ loading: false });
+          return { success: res.status, message: res.message };
+        } catch (e: any) {
+          const msg = message(e, "Failed to set password");
+          set({ loading: false, error: msg });
+          return { success: false, message: msg };
+        }
+      },
+    }),
     {
       name: "auth-storage",
       partialize: (state) => ({
