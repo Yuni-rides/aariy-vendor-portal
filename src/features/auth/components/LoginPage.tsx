@@ -62,6 +62,9 @@ export default function LoginPage() {
             }}
           />
         </Field>
+        <Link href="/forgot-password" className="-mt-2 self-end text-[13px] text-primary hover:underline">
+          Forgot password?
+        </Link>
         {AUTH_BYPASS && (
           <p className="m-0 rounded-[10px] bg-secondary px-3 py-2 text-xs text-muted-foreground">
             Test mode: any email and password signs in as the brand owner. manager@aariy.test, catalogue@aariy.test

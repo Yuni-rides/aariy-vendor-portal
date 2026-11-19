@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/login", "/register", "/set-password"];
+const PUBLIC_ROUTES = ["/login", "/register", "/set-password", "/forgot-password", "/reset-password"];
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -17,6 +17,7 @@ const PROTECTED_PREFIXES = [
   "/team",
   "/brand-profile",
   "/api-keys",
+  "/change-password",
   "/onboarding",
   "/tiers",
   "/settings",

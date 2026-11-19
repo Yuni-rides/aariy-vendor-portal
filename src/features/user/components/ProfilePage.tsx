@@ -8,9 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { toast } from "@/hooks/useToast";
-import { requestForToken } from "@/lib/firebase";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { AUTH_BYPASS } from "@/features/auth/auth.mock";
 import { useUserStore } from "../user.store";
 import { UpdateProfileDto } from "../user.types";
 import {
@@ -103,10 +101,7 @@ export default function ProfilePage() {
     if (res.success) setPasswords(EMPTY_PASSWORDS);
   };
 
-  const handleLogout = async () => {
-    const token = AUTH_BYPASS ? null : await requestForToken();
-    await logout(token || "");
-  };
+  const handleLogout = () => logout();
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
 

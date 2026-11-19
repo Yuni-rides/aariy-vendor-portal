@@ -1,5 +1,4 @@
 import { AppLayout } from "@/components/layout";
-import NotificationListener from "@/components/NotificationListener";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -16,7 +15,6 @@ export default async function ProtectedLayout({
   }
   return (
     <AppLayout>
-      <NotificationListener />
       {children}
     </AppLayout>
   );

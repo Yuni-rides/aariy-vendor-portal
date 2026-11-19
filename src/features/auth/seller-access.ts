@@ -25,7 +25,11 @@ export const ROLE_ACCESS: Record<SellerRole, string[] | "ALL"> = {
 export const sellerRoleOf = (u: AuthUser | null): SellerRole => u?.sellerRole ?? "OWNER";
 export const accountStatusOf = (u: AuthUser | null): SellerAccountStatus => u?.accountStatus ?? "APPROVED";
 
+/** Account screens every role can open. */
+const EVERY_ROLE = ["/change-password"];
+
 export function canAccess(role: SellerRole, pathname: string): boolean {
+  if (EVERY_ROLE.includes(pathname)) return true;
   const allowed = ROLE_ACCESS[role];
   if (allowed === "ALL") return true;
   return allowed.some((p) => pathname === p || pathname.startsWith(`${p}/`));

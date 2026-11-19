@@ -8,6 +8,13 @@ export const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 export const MOCK_ACCESS_TOKEN = "dev-bypass-token";
 
+/** Reset link token that works in test mode. "expired" acts like an old link. */
+export const MOCK_RESET_TOKEN = "dev-reset-token";
+export const MOCK_EXPIRED_TOKEN = "expired";
+
+/** In test mode this current password is treated as wrong, to try the error. */
+export const MOCK_WRONG_PASSWORD = "wrong-password";
+
 /**
  * Test emails that sign in as a team member with a narrower role.
  * Any other email (with any password) signs in as the owner of the approved test brand.

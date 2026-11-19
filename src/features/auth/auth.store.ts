@@ -2,8 +2,14 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import Cookies from "js-cookie";
 import { authApi } from "./auth.api";
-import { AuthResult, AuthUser, LoginDto, RegisterDto, SetPasswordDto } from "./auth.types";
-import { AUTH_BYPASS, MOCK_ACCESS_TOKEN, buildMockUser } from "./auth.mock";
+import { AuthResult, AuthUser, ChangePasswordDto, LoginDto, RegisterDto, SetPasswordDto } from "./auth.types";
+import {
+  AUTH_BYPASS,
+  MOCK_ACCESS_TOKEN,
+  MOCK_EXPIRED_TOKEN,
+  MOCK_WRONG_PASSWORD,
+  buildMockUser,
+} from "./auth.mock";
 import { isValidEmailAddress, isValidPkMobile, passwordProblem, toE164 } from "./auth.helpers";
 
 type AuthStore = {
@@ -16,11 +22,32 @@ type AuthStore = {
   register: (dto: RegisterDto) => Promise<AuthResult>;
   /** Local update after a change the API confirmed (e.g. onboarding submitted). */
   patchUser: (patch: Partial<AuthUser>) => void;
-  logout: (fcmToken: string) => Promise<void>;
+  logout: () => Promise<void>;
   setPassword: (dto: SetPasswordDto) => Promise<AuthResult>;
+  forgotPassword: (email: string) => Promise<AuthResult>;
+  resetPassword: (dto: SetPasswordDto) => Promise<AuthResult>;
+  changePassword: (dto: ChangePasswordDto) => Promise<AuthResult>;
 };
 
 const message = (e: any, fallback: string) => e?.response?.data?.message ?? fallback;
+
+/** Runs an API call with the loading flag and turns errors into a result. */
+const call = async (
+  set: (s: Partial<AuthStore>) => void,
+  fn: () => Promise<{ status: boolean; message: string }>,
+  fallback: string,
+): Promise<AuthResult> => {
+  set({ loading: true, error: null });
+  try {
+    const res = await fn();
+    set({ loading: false });
+    return { success: res.status, message: res.message ?? fallback };
+  } catch (e: any) {
+    const msg = message(e, fallback);
+    set({ loading: false, error: msg });
+    return { success: false, message: msg };
+  }
+};
 
 const startSession = (token: string, user: AuthUser) => {
   Cookies.set("token", token, { expires: 1, sameSite: "lax" });
@@ -113,9 +140,9 @@ export const useAuthStore = create<AuthStore>()(
         if (user) set({ user: { ...user, ...patch } });
       },
 
-      logout: async (fcmToken: string) => {
+      logout: async () => {
         try {
-          if (!AUTH_BYPASS) await authApi.logout({ fcmToken });
+          if (!AUTH_BYPASS) await authApi.logout();
         } catch (error) {
           console.error("Logout API failed", error);
         } finally {
@@ -137,6 +164,38 @@ export const useAuthStore = create<AuthStore>()(
           set({ loading: false, error: msg });
           return { success: false, message: msg };
         }
+      },
+
+      forgotPassword: async (raw) => {
+        const email = raw.trim().toLowerCase();
+        if (!isValidEmailAddress(email)) return { success: false, message: "Enter a valid email address." };
+        if (AUTH_BYPASS) return { success: true, message: "Reset link sent." };
+        return call(set, () => authApi.forgotPassword({ email }), "Could not send the link. Try again.");
+      },
+
+      resetPassword: async ({ token, password }) => {
+        if (!token) return { success: false, message: "This reset link is not valid." };
+        const pw = passwordProblem(password);
+        if (pw) return { success: false, message: pw };
+        if (AUTH_BYPASS) {
+          return token === MOCK_EXPIRED_TOKEN
+            ? { success: false, message: "This reset link has expired. Ask for a new one." }
+            : { success: true, message: "Password updated." };
+        }
+        return call(set, () => authApi.resetPassword({ token, password }), "Could not update the password. Try again.");
+      },
+
+      changePassword: async ({ currentPassword, newPassword }) => {
+        if (!currentPassword) return { success: false, message: "Enter your current password." };
+        const pw = passwordProblem(newPassword);
+        if (pw) return { success: false, message: pw };
+        if (newPassword === currentPassword) return { success: false, message: "Pick a password you are not using now." };
+        if (AUTH_BYPASS) {
+          return currentPassword === MOCK_WRONG_PASSWORD
+            ? { success: false, message: "Your current password is not right." }
+            : { success: true, message: "Password changed." };
+        }
+        return call(set, () => authApi.changePassword({ currentPassword, newPassword }), "Could not change the password. Try again.");
       },
     }),
     {

@@ -53,7 +53,7 @@ export default function OnboardingPage() {
           <span className="hidden text-[13px] text-muted-foreground sm:inline">
             {[user.firstName, user.lastName].filter(Boolean).join(" ")}
           </span>
-          <Btn onClick={() => logout("")}>Sign out</Btn>
+          <Btn onClick={() => logout()}>Sign out</Btn>
         </div>
       </header>
       <main className="mx-auto max-w-5xl p-4 sm:p-8">

@@ -63,7 +63,6 @@ export type AuthUser = {
 export type LoginDto = {
   email: string;
   password: string;
-  fcmToken?: string;
 };
 
 export type LoginResponse = {
@@ -97,6 +96,11 @@ export type LoginResponse = {
 export type SetPasswordDto = {
   token: string;
   password: string;
+};
+
+export type ChangePasswordDto = {
+  currentPassword: string;
+  newPassword: string;
 };
 
 export type SetPasswordResponse = {

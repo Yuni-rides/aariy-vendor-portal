@@ -15,6 +15,7 @@ import {
   Menu,
   User,
   LogOut,
+  Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,8 +30,6 @@ import {
   DropdownMenuTrigger,
 } from "./ui/DropdownMenu";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { requestForToken } from "@/lib/firebase";
-import { AUTH_BYPASS } from "@/features/auth/auth.mock";
 import { canAccess, sellerRoleOf } from "@/features/auth/seller-access";
 import { SellerGate } from "@/components/SellerGate";
 
@@ -131,10 +130,7 @@ export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
-  const handleLogout = async () => {
-    const token = AUTH_BYPASS ? null : await requestForToken();
-    await logout(token || "");
-  };
+  const handleLogout = () => logout();
 
   const initials =
     `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase() ||
@@ -198,9 +194,14 @@ export function Header() {
                 <User className="mr-2 h-4 w-4" />
                 <span>Brand profile</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
             </>
           )}
+
+          <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/change-password")}>
+            <Lock className="mr-2 h-4 w-4" />
+            <span>Change password</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
 
           <DropdownMenuItem
             onClick={handleLogout}
