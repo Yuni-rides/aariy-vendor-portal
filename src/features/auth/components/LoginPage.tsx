@@ -7,7 +7,7 @@ import { toast } from "@/hooks/useToast";
 import { Btn, Field, fieldClass } from "@/shared/ui/seller";
 import { useAuthStore } from "../auth.store";
 import { AUTH_BYPASS } from "../auth.mock";
-import { canAccess, landingFor, sellerRoleOf, accountStatusOf } from "../seller-access";
+import { landingFor, mayOpen } from "../seller-access";
 import { AuthShell, PasswordInput } from "./AuthShell";
 
 export default function LoginPage() {
@@ -28,7 +28,7 @@ export default function LoginPage() {
     const user = useAuthStore.getState().user;
     toast({ title: "Signed in" });
     const safeRedirect =
-      redirect && redirect.startsWith("/") && accountStatusOf(user) === "APPROVED" && canAccess(sellerRoleOf(user), redirect)
+      redirect && redirect.startsWith("/") && !redirect.startsWith("//") && mayOpen(user, redirect)
         ? redirect
         : null;
     router.replace(safeRedirect ?? landingFor(user));

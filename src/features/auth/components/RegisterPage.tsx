@@ -10,6 +10,7 @@ import { RegisterDto } from "../auth.types";
 import { isValidEmailAddress, isValidPkMobile, passwordProblem, toE164 } from "../auth.helpers";
 import { useOnboardingStore } from "@/features/onboarding/onboarding.store";
 import { AuthShell, PasswordInput } from "./AuthShell";
+import { landingFor } from "../seller-access";
 
 type Form = RegisterDto & { confirmPassword: string };
 type Errors = Partial<Record<keyof Form, string>>;
@@ -60,8 +61,8 @@ export default function RegisterPage() {
       email: form.email.trim().toLowerCase(),
       brandName: form.brandName,
     });
-    toast({ title: "Account created", description: "Next, complete your onboarding." });
-    router.replace("/onboarding");
+    toast({ title: "Account created" });
+    router.replace(landingFor(useAuthStore.getState().user));
   };
 
   return (

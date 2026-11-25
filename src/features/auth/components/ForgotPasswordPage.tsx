@@ -2,63 +2,35 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/useToast";
-import { Btn, Field, Muted, fieldClass } from "@/shared/ui/seller";
+import { Btn, Field, fieldClass } from "@/shared/ui/seller";
 import { useAuthStore } from "../auth.store";
-import { AUTH_BYPASS, MOCK_RESET_TOKEN } from "../auth.mock";
 import { AuthShell } from "./AuthShell";
 
+/** Asks the API for a reset code (sent to the account's mobile number), then opens /reset-password. */
 export default function ForgotPasswordPage() {
-  const { loading, forgotPassword } = useAuthStore();
-  const [email, setEmail] = useState("");
+  const router = useRouter();
+  const { loading, forgotPassword, resetLogin } = useAuthStore();
+  const [email, setEmail] = useState(resetLogin ?? "");
   const [error, setError] = useState<string>();
-  const [sentTo, setSentTo] = useState<string | null>(null);
 
-  const send = async (e?: FormEvent) => {
-    e?.preventDefault();
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
     const res = await forgotPassword(email);
     if (!res.success) {
       setError(res.message);
       return;
     }
-    if (sentTo) toast({ title: "Link sent again" });
-    setSentTo(email.trim().toLowerCase());
+    toast({ title: "Code sent", description: res.message });
+    router.push("/reset-password");
   };
 
-  if (sentTo) {
-    return (
-      <AuthShell title="Check your email">
-        <div className="flex flex-col gap-4">
-          <Muted>
-            If <b className="text-foreground">{sentTo}</b> has an Aariy seller account, we sent a link to reset the
-            password. The link works for 60 minutes.
-          </Muted>
-          {AUTH_BYPASS && (
-            <p className="m-0 rounded-[10px] bg-secondary px-3 py-2 text-xs text-muted-foreground">
-              Test mode: no email is sent.{" "}
-              <Link href={`/reset-password?token=${MOCK_RESET_TOKEN}`} className="text-primary hover:underline">
-                Open the reset link
-              </Link>
-            </p>
-          )}
-          <Btn onClick={() => send()} disabled={loading}>
-            {loading ? "Sending..." : "Send the link again"}
-          </Btn>
-          <div className="flex flex-wrap justify-between gap-2 text-[13px]">
-            <button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => setSentTo(null)}>
-              Use a different email
-            </button>
-            <Link href="/login" className="text-primary hover:underline">
-              Back to sign in
-            </Link>
-          </div>
-        </div>
-      </AuthShell>
-    );
-  }
-
   return (
-    <AuthShell title="Forgot password" subtitle="Enter the email you sign in with and we will send you a reset link.">
+    <AuthShell
+      title="Forgot password"
+      subtitle="Enter the email you sign in with. We will send a code to the mobile number on your account."
+    >
       <form onSubmit={send} noValidate className="flex flex-col gap-4">
         <Field label="Email" htmlFor="fp-email" error={error}>
           <input
@@ -75,10 +47,14 @@ export default function ForgotPasswordPage() {
           />
         </Field>
         <Btn primary type="submit" disabled={loading}>
-          {loading ? "Sending..." : "Send reset link"}
+          {loading ? "Sending..." : "Send code"}
         </Btn>
         <p className="m-0 text-center text-[13px] text-muted-foreground">
-          Remembered it?{" "}
+          Already have a code?{" "}
+          <Link href="/reset-password" className="text-primary hover:underline">
+            Enter it
+          </Link>
+          {" · "}
           <Link href="/login" className="text-primary hover:underline">
             Back to sign in
           </Link>

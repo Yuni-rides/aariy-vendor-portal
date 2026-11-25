@@ -41,6 +41,26 @@ export const homeFor = (role: SellerRole): string => {
   return allowed === "ALL" ? "/dashboard" : allowed[0];
 };
 
-/** Approved sellers use the portal; everyone else finishes or waits on onboarding. */
-export const landingFor = (u: AuthUser | null): string =>
-  accountStatusOf(u) === "APPROVED" ? homeFor(sellerRoleOf(u)) : "/onboarding";
+export const CHANGE_PASSWORD_PATH = "/change-password";
+export const BRAND_PROFILE_PATH = "/brand-profile";
+
+/** Sessions without the flag (older sessions, test mode) count as live. */
+export const isLiveSeller = (u: AuthUser | null): boolean => u?.isLive !== false;
+
+/** Screens a seller that is not live yet can open. */
+export const NOT_LIVE_PATHS = [BRAND_PROFILE_PATH, CHANGE_PASSWORD_PATH];
+
+/**
+ * Where to send a signed-in user:
+ * brand profile while the seller is not live (isLive false), otherwise the role's home screen.
+ */
+export const landingFor = (u: AuthUser | null): string => {
+  if (!isLiveSeller(u)) return BRAND_PROFILE_PATH;
+  return homeFor(sellerRoleOf(u));
+};
+
+/** Whether this user may open this screen right now. */
+export const mayOpen = (u: AuthUser | null, pathname: string): boolean => {
+  if (!isLiveSeller(u)) return NOT_LIVE_PATHS.includes(pathname);
+  return canAccess(sellerRoleOf(u), pathname);
+};

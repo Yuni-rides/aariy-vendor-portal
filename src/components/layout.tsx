@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -30,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/DropdownMenu";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { canAccess, sellerRoleOf } from "@/features/auth/seller-access";
+import { canAccess, isLiveSeller, mayOpen, sellerRoleOf } from "@/features/auth/seller-access";
 import { SellerGate } from "@/components/SellerGate";
 
 type NavItem = {
@@ -125,7 +126,18 @@ export function Sidebar({
   );
 }
 
-export function Header() {
+/**
+ * The sidebar only shows for live sellers (isLive true in the sign-in response).
+ * Waits for the auth store to load from storage so it does not flash in and out.
+ */
+function useShowSidebar() {
+  const user = useAuthStore((state) => state.user);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated && isLiveSeller(user);
+}
+
+export function Header({ showSidebar }: { showSidebar: boolean }) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -140,21 +152,29 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-10 flex min-h-[61px] items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:px-8">
-      <div className="flex items-center gap-3 lg:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Open menu">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[232px] p-0">
-            <Sidebar />
-          </SheetContent>
-        </Sheet>
-        <span className="text-lg font-semibold">Aariy</span>
-      </div>
-
-      <div className="hidden flex-1 lg:flex" />
+      {showSidebar ? (
+        <>
+          <div className="flex items-center gap-3 lg:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open menu">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[232px] p-0">
+                <Sidebar />
+              </SheetContent>
+            </Sheet>
+            <span className="text-lg font-semibold">Aariy</span>
+          </div>
+          <div className="hidden flex-1 lg:flex" />
+        </>
+      ) : (
+        <div>
+          <div className="text-lg font-semibold leading-tight">Aariy</div>
+          <div className="text-xs text-muted-foreground">Seller portal</div>
+        </div>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -185,7 +205,7 @@ export function Header() {
 
           <DropdownMenuSeparator />
 
-          {canAccess(sellerRoleOf(user), "/brand-profile") && (
+          {mayOpen(user, "/brand-profile") && (
             <>
               <DropdownMenuItem
                 className="cursor-pointer"
@@ -217,13 +237,16 @@ export function Header() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const showSidebar = useShowSidebar();
   return (
     <div className="flex min-h-screen">
-      <div className="fixed inset-y-0 left-0 z-20 hidden lg:block">
-        <Sidebar />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-[232px]">
-        <Header />
+      {showSidebar && (
+        <div className="fixed inset-y-0 left-0 z-20 hidden lg:block">
+          <Sidebar />
+        </div>
+      )}
+      <div className={cn("flex min-w-0 flex-1 flex-col", showSidebar && "lg:pl-[232px]")}>
+        <Header showSidebar={showSidebar} />
         <main className="min-w-0 flex-1 overflow-auto p-4 sm:px-8 sm:py-6">
           <SellerGate>{children}</SellerGate>
         </main>

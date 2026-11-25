@@ -44,9 +44,9 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <PageHeader title="Change password" />
-      <Panel className="max-w-xl">
+      <Panel>
         <PanelTitle>Your password</PanelTitle>
         <Muted>
           This changes the password for <b className="text-foreground">{user?.email || "your account"}</b> only. Team

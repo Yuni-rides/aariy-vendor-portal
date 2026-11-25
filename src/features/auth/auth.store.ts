@@ -2,11 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import Cookies from "js-cookie";
 import { authApi } from "./auth.api";
-import { AuthResult, AuthUser, ChangePasswordDto, LoginDto, RegisterDto, SetPasswordDto } from "./auth.types";
+import { AuthResult, AuthUser, ChangePasswordDto, LoginDto, PermissionMap, RegisterDto, ResetPasswordDto, SellerSession, SetPasswordDto } from "./auth.types";
 import {
   AUTH_BYPASS,
   MOCK_ACCESS_TOKEN,
-  MOCK_EXPIRED_TOKEN,
+  MOCK_WRONG_CODE,
   MOCK_WRONG_PASSWORD,
   buildMockUser,
 } from "./auth.mock";
@@ -15,17 +15,26 @@ import { isValidEmailAddress, isValidPkMobile, passwordProblem, toE164 } from ".
 type AuthStore = {
   user: AuthUser | null;
   accessToken: string | null;
+  refreshToken: string | null;
   loading: boolean;
   error: string | null;
+  /** Email a reset code was last asked for. Kept in memory only, to prefill the reset screen. */
+  resetLogin: string | null;
+  /** Where the API says the code went (e.g. a masked mobile number), when it tells us. */
+  resetSentTo: string | null;
 
   login: (dto: LoginDto) => Promise<AuthResult>;
   register: (dto: RegisterDto) => Promise<AuthResult>;
   /** Local update after a change the API confirmed (e.g. onboarding submitted). */
   patchUser: (patch: Partial<AuthUser>) => void;
   logout: () => Promise<void>;
+  /** Saves tokens from POST /seller/auth/refresh. */
+  setTokens: (accessToken: string, refreshToken?: string | null) => void;
+  /** Clears the session without calling the API (used when the refresh token no longer works). */
+  endSession: () => void;
   setPassword: (dto: SetPasswordDto) => Promise<AuthResult>;
   forgotPassword: (email: string) => Promise<AuthResult>;
-  resetPassword: (dto: SetPasswordDto) => Promise<AuthResult>;
+  resetPassword: (dto: ResetPasswordDto) => Promise<AuthResult>;
   changePassword: (dto: ChangePasswordDto) => Promise<AuthResult>;
 };
 
@@ -49,9 +58,37 @@ const call = async (
   }
 };
 
-const startSession = (token: string, user: AuthUser) => {
+const startSession = (token: string, user: AuthUser, refreshToken: string | null = null) => {
   Cookies.set("token", token, { expires: 1, sameSite: "lax" });
-  return { user, accessToken: token };
+  return { user, accessToken: token, refreshToken };
+};
+
+/** Turns the seller sign-in response into the portal's user. */
+const userFromSession = (d: SellerSession): AuthUser => {
+  const [firstName = "", ...rest] = (d.user.fullName ?? "").trim().split(/\s+/);
+  return {
+    id: d.user.id,
+    email: d.user.email,
+    firstName,
+    lastName: rest.join(" "),
+    phone: d.user.phone ?? null,
+    role: "SELLER",
+    sellerRole: d.seller?.role ?? "OWNER",
+    accountStatus: d.seller?.status ?? d.status,
+    // Sign-in flow: isLive false -> brand profile only (no sidebar). mustChangePassword is not used for routing.
+    isLive: !!d.isLive,
+    seller: d.seller
+      ? {
+          id: d.seller.id,
+          tradingName: d.seller.tradingName,
+          onboardingStep: d.seller.onboardingStep,
+          permissions: d.seller.permissions ?? [],
+          deadline: d.seller.deadline ?? null,
+        }
+      : null,
+    permissions: {} as PermissionMap,
+    company: null,
+  };
 };
 
 export const useAuthStore = create<AuthStore>()(
@@ -59,8 +96,11 @@ export const useAuthStore = create<AuthStore>()(
     (set, get) => ({
       user: null,
       accessToken: null,
+      refreshToken: null,
       loading: false,
       error: null,
+      resetLogin: null,
+      resetSentTo: null,
 
       login: async (dto) => {
         const email = dto.email.trim().toLowerCase();
@@ -75,13 +115,14 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         try {
-          const res = await authApi.login({ ...dto, email });
+          const res = await authApi.login({ login: email, password: dto.password });
           if (!res.status || !res.data) {
             const msg = res.message ?? "Wrong email or password.";
             set({ loading: false, error: msg });
             return { success: false, message: msg };
           }
-          set({ ...startSession(res.data.accessToken, res.data.user), loading: false });
+          const d = res.data;
+          set({ ...startSession(d.accessToken, userFromSession(d), d.refreshToken), loading: false });
           return { success: true, message: res.message };
         } catch (e: any) {
           const msg = message(e, "Wrong email or password.");
@@ -148,8 +189,23 @@ export const useAuthStore = create<AuthStore>()(
         } finally {
           Cookies.remove("token");
           localStorage.removeItem("auth-storage");
-          set({ user: null, accessToken: null });
+          set({ user: null, accessToken: null, refreshToken: null });
           window.location.href = "/login";
+        }
+      },
+
+      setTokens: (accessToken, refreshToken) => {
+        Cookies.set("token", accessToken, { expires: 1, sameSite: "lax" });
+        set({ accessToken, ...(refreshToken ? { refreshToken } : {}) });
+      },
+
+      endSession: () => {
+        Cookies.remove("token");
+        localStorage.removeItem("auth-storage");
+        set({ user: null, accessToken: null, refreshToken: null });
+        if (!window.location.pathname.startsWith("/login")) {
+          const back = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/login?redirect=${back}`;
         }
       },
 
@@ -169,20 +225,42 @@ export const useAuthStore = create<AuthStore>()(
       forgotPassword: async (raw) => {
         const email = raw.trim().toLowerCase();
         if (!isValidEmailAddress(email)) return { success: false, message: "Enter a valid email address." };
-        if (AUTH_BYPASS) return { success: true, message: "Reset link sent." };
-        return call(set, () => authApi.forgotPassword({ email }), "Could not send the link. Try again.");
+        if (AUTH_BYPASS) {
+          set({ resetLogin: email, resetSentTo: null });
+          return { success: true, message: "Code sent." };
+        }
+        let sentTo: string | null = null;
+        const res = await call(
+          set,
+          async () => {
+            const r = await authApi.forgotPassword({ login: email });
+            sentTo = r.data?.sentTo ?? null;
+            return r;
+          },
+          "Could not send the code. Try again.",
+        );
+        if (res.success) set({ resetLogin: email, resetSentTo: sentTo });
+        return res;
       },
 
-      resetPassword: async ({ token, password }) => {
-        if (!token) return { success: false, message: "This reset link is not valid." };
-        const pw = passwordProblem(password);
+      resetPassword: async ({ login, code, newPassword }) => {
+        const email = login.trim().toLowerCase();
+        if (!isValidEmailAddress(email)) return { success: false, message: "Enter a valid email address." };
+        if (!code.trim()) return { success: false, message: "Enter the code we sent you." };
+        const pw = passwordProblem(newPassword);
         if (pw) return { success: false, message: pw };
         if (AUTH_BYPASS) {
-          return token === MOCK_EXPIRED_TOKEN
-            ? { success: false, message: "This reset link has expired. Ask for a new one." }
+          return code.trim() === MOCK_WRONG_CODE
+            ? { success: false, message: "Request a new code to continue" }
             : { success: true, message: "Password updated." };
         }
-        return call(set, () => authApi.resetPassword({ token, password }), "Could not update the password. Try again.");
+        const res = await call(
+          set,
+          () => authApi.resetPassword({ login: email, code: code.trim(), newPassword }),
+          "Could not update the password. Try again.",
+        );
+        if (res.success) set({ resetLogin: null, resetSentTo: null });
+        return res;
       },
 
       changePassword: async ({ currentPassword, newPassword }) => {
@@ -190,12 +268,12 @@ export const useAuthStore = create<AuthStore>()(
         const pw = passwordProblem(newPassword);
         if (pw) return { success: false, message: pw };
         if (newPassword === currentPassword) return { success: false, message: "Pick a password you are not using now." };
-        if (AUTH_BYPASS) {
-          return currentPassword === MOCK_WRONG_PASSWORD
+        const res = AUTH_BYPASS
+          ? currentPassword === MOCK_WRONG_PASSWORD
             ? { success: false, message: "Your current password is not right." }
-            : { success: true, message: "Password changed." };
-        }
-        return call(set, () => authApi.changePassword({ currentPassword, newPassword }), "Could not change the password. Try again.");
+            : { success: true, message: "Password changed." }
+          : await call(set, () => authApi.changePassword({ currentPassword, newPassword }), "Could not change the password. Try again.");
+        return res;
       },
     }),
     {
@@ -203,6 +281,7 @@ export const useAuthStore = create<AuthStore>()(
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
       }),
     },
   ),

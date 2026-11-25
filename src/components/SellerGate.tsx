@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { accountStatusOf, canAccess, homeFor, sellerRoleOf } from "@/features/auth/seller-access";
+import { landingFor, mayOpen } from "@/features/auth/seller-access";
 
 /**
  * Client-side guard for the seller portal:
- * - accounts that are not approved yet go to onboarding;
+ * - a seller that is not live yet only sees the brand profile;
  * - each team role only sees its own screens (SOW 4.5).
  * TODO(api): the API must enforce the same rules on every endpoint; this only hides screens.
  */
@@ -19,15 +19,11 @@ export function SellerGate({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const role = sellerRoleOf(user);
-  const approved = accountStatusOf(user) === "APPROVED";
-  const allowed = approved && canAccess(role, pathname);
+  const allowed = mayOpen(user, pathname);
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (!approved) router.replace("/onboarding");
-    else if (!canAccess(role, pathname)) router.replace(homeFor(role));
-  }, [hydrated, approved, role, pathname, router]);
+    if (hydrated && !allowed) router.replace(landingFor(user));
+  }, [hydrated, allowed, user, router]);
 
   if (!hydrated || !allowed) return null;
   return <>{children}</>;

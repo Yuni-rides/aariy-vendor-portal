@@ -8,9 +8,8 @@ export const AUTH_BYPASS = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 export const MOCK_ACCESS_TOKEN = "dev-bypass-token";
 
-/** Reset link token that works in test mode. "expired" acts like an old link. */
-export const MOCK_RESET_TOKEN = "dev-reset-token";
-export const MOCK_EXPIRED_TOKEN = "expired";
+/** In test mode this reset code is treated as wrong or expired, to try the error. Any other code works. */
+export const MOCK_WRONG_CODE = "000000";
 
 /** In test mode this current password is treated as wrong, to try the error. */
 export const MOCK_WRONG_PASSWORD = "wrong-password";

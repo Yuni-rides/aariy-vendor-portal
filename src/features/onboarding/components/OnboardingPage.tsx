@@ -8,7 +8,7 @@ import { toast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/features/auth/auth.store";
 import { AUTH_BYPASS } from "@/features/auth/auth.mock";
-import { accountStatusOf, landingFor } from "@/features/auth/seller-access";
+import { landingFor } from "@/features/auth/seller-access";
 import { formatLongDate } from "@/features/orders/orders.helpers";
 import { Btn, Muted, Panel, PanelTitle } from "@/shared/ui/seller";
 import { useOnboardingStore } from "../onboarding.store";
@@ -24,11 +24,12 @@ export default function OnboardingPage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const approved = accountStatusOf(user) === "APPROVED";
+  // The seller sign-in flow does not use onboarding: send everyone to their landing screen.
+  const leave = true;
 
   useEffect(() => {
     if (!hydrated || !user) return;
-    if (approved) {
+    if (leave) {
       router.replace(landingFor(user));
       return;
     }
@@ -38,9 +39,9 @@ export default function OnboardingPage() {
       email: user.email,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, user, approved]);
+  }, [hydrated, user, leave]);
 
-  if (!hydrated || !user || approved) return null;
+  if (!hydrated || !user || leave) return null;
 
   return (
     <div className="min-h-screen bg-background">

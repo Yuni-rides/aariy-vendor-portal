@@ -1,5 +1,5 @@
-import BrandProfilePage from "@/features/brand-profile/components/BrandProfilePage";
+import BrandProfileSwitch from "@/features/seller-profile/components/BrandProfileSwitch";
 
 export default function Page() {
-  return <BrandProfilePage />;
+  return <BrandProfileSwitch />;
 }
