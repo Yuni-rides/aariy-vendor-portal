@@ -75,8 +75,9 @@ const userFromSession = (d: SellerSession): AuthUser => {
     role: "SELLER",
     sellerRole: d.seller?.role ?? "OWNER",
     accountStatus: d.seller?.status ?? d.status,
-    // Sign-in flow: isLive false -> brand profile only (no sidebar). mustChangePassword is not used for routing.
+    // Sign-in flow: mustChangePassword true -> change password first; then isLive false -> brand profile only (no sidebar).
     isLive: !!d.isLive,
+    mustChangePassword: !!d.mustChangePassword,
     seller: d.seller
       ? {
           id: d.seller.id,
@@ -273,6 +274,9 @@ export const useAuthStore = create<AuthStore>()(
             ? { success: false, message: "Your current password is not right." }
             : { success: true, message: "Password changed." }
           : await call(set, () => authApi.changePassword({ currentPassword, newPassword }), "Could not change the password. Try again.");
+        // The rest of the portal opens once the password is changed.
+        const user = get().user;
+        if (res.success && user?.mustChangePassword) set({ user: { ...user, mustChangePassword: false } });
         return res;
       },
     }),

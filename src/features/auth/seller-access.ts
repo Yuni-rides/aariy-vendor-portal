@@ -50,17 +50,23 @@ export const isLiveSeller = (u: AuthUser | null): boolean => u?.isLive !== false
 /** Screens a seller that is not live yet can open. */
 export const NOT_LIVE_PATHS = [BRAND_PROFILE_PATH, CHANGE_PASSWORD_PATH];
 
+/** Sign-in said mustChangePassword: true and the password is not changed yet. */
+export const mustChangePassword = (u: AuthUser | null): boolean => !!u?.mustChangePassword;
+
 /**
  * Where to send a signed-in user:
- * brand profile while the seller is not live (isLive false), otherwise the role's home screen.
+ * change password first if the sign-in asks for it, then brand profile while the seller
+ * is not live (isLive false), otherwise the role's home screen.
  */
 export const landingFor = (u: AuthUser | null): string => {
+  if (mustChangePassword(u)) return CHANGE_PASSWORD_PATH;
   if (!isLiveSeller(u)) return BRAND_PROFILE_PATH;
   return homeFor(sellerRoleOf(u));
 };
 
 /** Whether this user may open this screen right now. */
 export const mayOpen = (u: AuthUser | null, pathname: string): boolean => {
+  if (mustChangePassword(u)) return pathname === CHANGE_PASSWORD_PATH;
   if (!isLiveSeller(u)) return NOT_LIVE_PATHS.includes(pathname);
   return canAccess(sellerRoleOf(u), pathname);
 };

@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import { toast } from "@/hooks/useToast";
 import { Btn, Field, Muted, PageHeader, Panel, PanelTitle } from "@/shared/ui/seller";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "../auth.store";
+import { landingFor, mustChangePassword } from "../seller-access";
 import { AUTH_BYPASS, MOCK_WRONG_PASSWORD } from "../auth.mock";
 import { passwordProblem } from "../auth.helpers";
 import { PasswordInput } from "./AuthShell";
@@ -14,6 +16,9 @@ const EMPTY: Form = { current: "", next: "", confirm: "" };
 /** Signed-in user changes their own password. Every team role can open it. */
 export default function ChangePasswordPage() {
   const { loading, changePassword, user } = useAuthStore();
+  const router = useRouter();
+  // Sign-in said mustChangePassword: true. Remember it for this visit so the redirect still runs after the flag clears.
+  const [forced] = useState(() => mustChangePassword(user));
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Form>>({});
   const patch = (p: Partial<Form>) => {
@@ -36,6 +41,8 @@ export default function ChangePasswordPage() {
     if (res.success) {
       setForm(EMPTY);
       toast({ title: "Password changed", description: "Use the new password next time you sign in." });
+      // After a required change, go on to the screen this seller normally lands on.
+      if (forced) router.replace(landingFor(useAuthStore.getState().user));
     } else if (/current/i.test(res.message)) {
       setErrors({ current: res.message });
     } else {
@@ -46,6 +53,11 @@ export default function ChangePasswordPage() {
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <PageHeader title="Change password" />
+      {forced && (
+        <p className="m-0 rounded-[10px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Set a new password to continue. Use the password you signed in with as your current password.
+        </p>
+      )}
       <Panel>
         <PanelTitle>Your password</PanelTitle>
         <Muted>

@@ -54,6 +54,8 @@ export type AuthUser = {
   accountStatus?: SellerAccountStatus;
   /** Seller is live on Aariy. Until then the seller only works on the brand profile. */
   isLive?: boolean;
+  /** Sign-in said mustChangePassword: true. Only the change password screen opens until it is changed. */
+  mustChangePassword?: boolean;
   /** Seller account this session is working in. */
   seller?: {
     id: string;

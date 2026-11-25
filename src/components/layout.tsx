@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/DropdownMenu";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { canAccess, isLiveSeller, mayOpen, sellerRoleOf } from "@/features/auth/seller-access";
+import { canAccess, isLiveSeller, mayOpen, mustChangePassword, sellerRoleOf } from "@/features/auth/seller-access";
 import { SellerGate } from "@/components/SellerGate";
 
 type NavItem = {
@@ -134,7 +134,7 @@ function useShowSidebar() {
   const user = useAuthStore((state) => state.user);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  return hydrated && isLiveSeller(user);
+  return hydrated && isLiveSeller(user) && !mustChangePassword(user);
 }
 
 export function Header({ showSidebar }: { showSidebar: boolean }) {

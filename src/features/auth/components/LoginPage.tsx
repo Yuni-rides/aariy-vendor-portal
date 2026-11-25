@@ -74,12 +74,12 @@ export default function LoginPage() {
         <Btn primary type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </Btn>
-        <p className="m-0 text-center text-[13px] text-muted-foreground">
+        {/* <p className="m-0 text-center text-[13px] text-muted-foreground">
           New to Aariy?{" "}
           <Link href="/register" className="text-primary hover:underline">
             Create a seller account
           </Link>
-        </p>
+        </p> */}
       </form>
     </AuthShell>
   );
