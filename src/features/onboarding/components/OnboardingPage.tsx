@@ -24,7 +24,6 @@ export default function OnboardingPage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  // The seller sign-in flow does not use onboarding: send everyone to their landing screen.
   const leave = true;
 
   useEffect(() => {
@@ -38,7 +37,6 @@ export default function OnboardingPage() {
       fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       email: user.email,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, user, leave]);
 
   if (!hydrated || !user || leave) return null;
@@ -64,7 +62,6 @@ export default function OnboardingPage() {
   );
 }
 
-/* ---------------- Wizard ---------------- */
 
 function Wizard() {
   const { draft: saved, completed, status, reviewNote, saving, saveStep, submit } = useOnboardingStore();
@@ -73,7 +70,6 @@ function Wizard() {
   const [draft, setDraft] = useState<OnboardingDraft>(saved);
   const [errors, setErrors] = useState<StepErrors>({});
 
-  // Pick up the saved draft once it loads from storage.
   useEffect(() => setDraft(saved), [saved]);
 
   const step = STEPS[index];
@@ -125,7 +121,6 @@ function Wizard() {
         <Panel className="flex flex-col gap-1 self-start p-3">
           {STEPS.map((s, i) => {
             const isDone = completed.includes(s.key);
-            // Steps open in order: any saved step, or the first one not yet saved.
             const reachable = isDone || i <= firstOpen || firstOpen === -1;
             return (
               <button
@@ -179,7 +174,6 @@ function Wizard() {
   );
 }
 
-/* ---------------- After submit ---------------- */
 
 function StatusView() {
   const router = useRouter();

@@ -1,34 +1,46 @@
 import { http } from "@/shared/api/http";
 
-/**
- * Country and city lists for pickers.
- *   GET /countries?page=1&limit=20&search=United States
- *   GET /cities?page=1&limit=10&search=sargodha
- *   GET /provinces?countryCode=PK&page=1&limit=20
- */
-
 export type Country = { id: string; name: string; code?: string };
-export type Province = { id: string; code: string; name: string; type?: string; countryCode?: string };
-export type City = { id: string; name: string; countryId?: string; regionName?: string };
+export type Province = {
+  id: string;
+  code: string;
+  name: string;
+  type?: string;
+  countryCode?: string;
+};
+export type City = {
+  id: string;
+  name: string;
+  countryId?: string;
+  regionName?: string;
+};
 
 export type ListQuery = { search?: string; page?: number; limit?: number };
 export type Page<T> = { items: T[]; page: number; hasMore: boolean };
 
-/* ---------------- Response parsing ----------------
- * The API answers { status, data: { data: [...], meta: { page, limit, total } } }.
- * Other common list shapes are read too, in case an endpoint differs.
- */
-
 const pickArray = (x: any): any[] | null => {
   if (Array.isArray(x)) return x;
   if (!x || typeof x !== "object") return null;
-  for (const k of ["items", "data", "rows", "results", "list", "countries", "cities"]) {
+  for (const k of [
+    "items",
+    "data",
+    "rows",
+    "results",
+    "list",
+    "countries",
+    "cities",
+  ]) {
     if (Array.isArray(x[k])) return x[k];
   }
   return null;
 };
 
-function toPage<T>(body: any, page: number, limit: number, map: (x: any) => T): Page<T> {
+function toPage<T>(
+  body: any,
+  page: number,
+  limit: number,
+  map: (x: any) => T,
+): Page<T> {
   const root = body?.data ?? body;
   const list = pickArray(root) ?? pickArray(root?.data) ?? [];
   const meta = root?.meta ?? root?.pagination ?? root?.data?.meta ?? root ?? {};
@@ -45,7 +57,11 @@ function toPage<T>(body: any, page: number, limit: number, map: (x: any) => T): 
   return { items: list.map(map), page, hasMore };
 }
 
-const toCountry = (x: any): Country => ({ id: String(x.id), name: String(x.name ?? x.code ?? ""), code: x.code ?? x.countryCode });
+const toCountry = (x: any): Country => ({
+  id: String(x.id),
+  name: String(x.name ?? x.code ?? ""),
+  code: x.code ?? x.countryCode,
+});
 
 const toCity = (x: any): City => ({
   id: String(x.id),
@@ -62,8 +78,6 @@ const toProvince = (x: any): Province => ({
   countryCode: x.country?.code ?? x.countryCode ?? undefined,
 });
 
-/* ---------------- API ---------------- */
-
 const params = ({ search, page = 1, limit = 20 }: ListQuery) => ({
   page,
   limit,
@@ -77,25 +91,34 @@ export const locationsApi = {
     return toPage(res.data, p.page, p.limit, toCountry);
   },
 
-  /**
-   * GET /provinces?countryCode=PK: provinces, states and territories of one country.
-   * The API filters by countryCode; rows of another country are dropped here as a safety net.
-   */
-  provinces: async (q: ListQuery & { countryCode?: string }): Promise<Page<Province>> => {
-    const p = { ...params(q), ...(q.countryCode ? { countryCode: q.countryCode } : {}) };
+  provinces: async (
+    q: ListQuery & { countryCode?: string },
+  ): Promise<Page<Province>> => {
+    const p = {
+      ...params(q),
+      ...(q.countryCode ? { countryCode: q.countryCode } : {}),
+    };
     const res = await http.get("/provinces", { params: p });
     const page = toPage(res.data, p.page, p.limit, toProvince);
     const want = q.countryCode?.toUpperCase();
-    return want ? { ...page, items: page.items.filter((x) => !x.countryCode || x.countryCode.toUpperCase() === want) } : page;
+    return want
+      ? {
+          ...page,
+          items: page.items.filter(
+            (x) => !x.countryCode || x.countryCode.toUpperCase() === want,
+          ),
+        }
+      : page;
   },
 
-  /** GET /cities?countryId=...&regionId=...: the API filters by country and province. */
-  cities: async (q: ListQuery & { countryId?: string; provinceId?: string }): Promise<Page<City>> => {
+  cities: async (
+    q: ListQuery & { countryId?: string; provinceId?: string },
+  ): Promise<Page<City>> => {
     const p = {
       ...params({ ...q, limit: q.limit ?? 10 }),
-      ...(q.countryId ? { countryId: q.countryId } : {}),
-      // The API calls the province filter regionId (provinceId is rejected).
-      ...(q.provinceId ? { regionId: q.provinceId } : {}),
+      // GET /cities?regionId={provinceId}: cities of the picked province only.
+      // countryId is sent only while no province is picked.
+      ...(q.provinceId ? { regionId: q.provinceId } : q.countryId ? { countryId: q.countryId } : {}),
     };
     const res = await http.get("/cities", { params: p });
     return toPage(res.data, p.page, p.limit, toCity);
