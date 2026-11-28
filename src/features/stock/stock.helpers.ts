@@ -29,7 +29,7 @@ export function toStockRows(products: Product[]): StockRow[] {
         sku: v.sku,
         stock: v.stock,
         reserved: v.reserved,
-        leadTimeDays: p.dispatchLeadTimeDays,
+        leadTimeDays: p.dispatchMaxDays,
       })),
     );
 }

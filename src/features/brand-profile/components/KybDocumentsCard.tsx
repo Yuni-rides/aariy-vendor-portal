@@ -133,7 +133,14 @@ export function KybDocumentsCard({ draft, onChange }: { draft: KybDraft; onChang
                 ) : onFile?.status === "REJECTED" && onFile.note ? (
                   <p className="m-0 mt-1 text-xs text-destructive">{onFile.note}</p>
                 ) : onFile ? (
-                  <p className="m-0 mt-1 text-xs text-muted-foreground">Uploaded {formatLongDate(onFile.uploadedAt)}</p>
+                  <p className="m-0 mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                    {onFile.uploadedAt && <span>Uploaded {formatLongDate(onFile.uploadedAt)}</span>}
+                    {onFile.url && (
+                      <a href={onFile.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        View file
+                      </a>
+                    )}
+                  </p>
                 ) : (
                   !required.has(d.key) && d.when && <p className="m-0 mt-1 text-xs text-muted-foreground">{d.when}</p>
                 )}
@@ -154,7 +161,16 @@ export function KybDocumentsCard({ draft, onChange }: { draft: KybDraft; onChang
             <div className="min-w-0">
               <div className="font-medium">{o.label}</div>
               <div className="truncate text-[13px] text-muted-foreground">
-                {o.name} · uploaded {formatLongDate(o.uploadedAt)}
+                {o.name}
+                {o.uploadedAt && ` · uploaded ${formatLongDate(o.uploadedAt)}`}
+                {o.url && (
+                  <>
+                    {" · "}
+                    <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      View
+                    </a>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">

@@ -445,7 +445,7 @@ function BankCard() {
       </div>
       {bank ? (
         <Muted>
-          {bank.bankName} · {maskedIban(bank.ibanLast4)}
+          {bank.bankName} · {bank.accountNumberMasked ? `Account ${bank.accountNumberMasked}` : maskedIban(bank.ibanLast4)}
           <br />
           {bank.accountTitle}
         </Muted>

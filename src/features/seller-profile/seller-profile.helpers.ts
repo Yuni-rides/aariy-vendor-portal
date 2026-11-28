@@ -148,6 +148,7 @@ export function normalizeProfile(raw: any): SellerProfileResponse {
         accountTitle: bank.accountTitle ?? null,
         accountNumber: bank.accountNumberMasked ?? null,
         hasIban: !!bank.hasIban,
+        bankStatus: bank.status ?? null,
       },
       brands: arr(p.brands),
       documents: arr(p.documents),

@@ -9,21 +9,40 @@ export type ProductVariant = {
   colour: string;
   sku: string;
   barcode?: string;
+  /** Selling price in rupees (sent as priceMinor = Rs × 100). */
   price: number;
-  /** Units the seller has on hand. */
+  /** Price before discount in rupees, shown crossed out (sent as compareAtMinor). */
+  compareAt?: number;
+  /** Units the seller has on hand (stockOnHand). */
   stock: number;
   /** Units held for pending and confirmed Aariy orders (set by the backend). */
   reserved: number;
 };
 
-/** Measurements in cm. Chest and length are required; the rest are optional. */
-export type SizeChartRow = {
-  size: string;
-  chest: string;
-  waist?: string;
-  hip?: string;
-  length: string;
-  sleeve?: string;
+/** Value of one category field: text, number, yes/no, or several picked options. */
+export type AttributeValue = string | number | boolean | string[];
+
+export type CategoryFieldType = "TEXT" | "NUMBER" | "DROPDOWN" | "YES_NO" | "MULTI_SELECT";
+
+/** One field from GET /seller/categories/:id/fields. */
+export type CategoryField = {
+  key: string;
+  label: string;
+  type: CategoryFieldType;
+  required?: boolean;
+  options?: string[];
+  /** true: the field is a variant column (e.g. size), not a product detail. */
+  isVariant?: boolean;
+};
+
+/** Brand size chart (GET/POST /seller/size-charts). Shared by the brand's products. */
+export type SizeChart = {
+  id: string;
+  name: string;
+  unit: "CM" | "IN";
+  /** First column is the size, e.g. ["Size", "Chest", "Waist", "Length"]. */
+  columns: string[];
+  rows: string[][];
 };
 
 export type Product = {
@@ -35,10 +54,25 @@ export type Product = {
   material?: string;
   /** Washing and care instructions shown on the product page. */
   care?: string;
-  dispatchLeadTimeDays: number;
+  /** Days from order to dispatch: from / to (0 to 60). */
+  dispatchMinDays: number;
+  dispatchMaxDays: number;
+  /** Category fields that are not variant columns. */
+  attributes: Record<string, AttributeValue>;
   variants: ProductVariant[];
   images: string[];
-  sizeChart: SizeChartRow[];
+  sizeChartId?: string;
+  /** Customs, only needed to ship abroad. */
+  hsCode?: string;
+  fibreContent?: string;
+  countryOfOrigin?: string;
+  /** Declared value in rupees (sent as declaredValueMinor). */
+  declaredValue?: number;
+  /** Search engine listing. Empty means name and description are used. */
+  metaTitle?: string;
+  metaDescription?: string;
+  /** Made by the server from the brand and product name. */
+  slug?: string;
   addedBy: ProductAddedBy;
   status: ProductStatus;
   rejectionReason?: string | null;
@@ -52,6 +86,8 @@ export type LeafCategory = {
   name: string;
   /** Full path, e.g. "Women › Clothing › Eastern Ready to wear › Kurta set". */
   path: string;
+  /** Fields of this category (GET /seller/categories/:id/fields). */
+  fields: CategoryField[];
 };
 
 export type ProductTab = "ALL" | ProductStatus;
@@ -64,9 +100,11 @@ export type ProductsFilter = {
 
 export type SaveProductPayload = Omit<
   Product,
-  "id" | "status" | "addedBy" | "rejectionReason" | "updatedAt" | "categoryName"
+  "id" | "status" | "addedBy" | "rejectionReason" | "updatedAt" | "categoryName" | "slug"
 >;
 
 export type SaveMode = "DRAFT" | "SUBMIT";
 
 export type ProductResult = { success: boolean; message: string; product?: Product };
+
+export type SizeChartResult = { success: boolean; message: string; chart?: SizeChart };

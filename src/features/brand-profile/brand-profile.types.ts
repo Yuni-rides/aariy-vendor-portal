@@ -38,7 +38,12 @@ export type LegalDetails = {
 export type KybDocStatus = "APPROVED" | "IN_REVIEW" | "REJECTED";
 
 /** A KYB file on record. New or replaced files go back to Aariy review. */
-export type KybDoc = UploadedDoc & { status: KybDocStatus; note?: string | null };
+export type KybDoc = UploadedDoc & {
+  status: KybDocStatus;
+  note?: string | null;
+  /** Link to open the file (S3 base URL + key). */
+  url?: string | null;
+};
 
 export type OtherKybDoc = KybDoc & { id: string; label: string };
 
@@ -66,6 +71,8 @@ export type BankAccount = {
   bankName: string;
   accountTitle: string;
   ibanLast4: string;
+  /** Masked account number from the API, e.g. "••••3933"; shown instead of the IBAN when set. */
+  accountNumberMasked?: string | null;
   status: BankStatus;
 };
 

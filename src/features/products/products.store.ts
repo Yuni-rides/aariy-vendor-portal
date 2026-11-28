@@ -1,11 +1,13 @@
 import { create } from "zustand";
-import { LEAF_CATEGORIES_MOCK, PRODUCTS_MOCK } from "./products.mock";
+import { LEAF_CATEGORIES_MOCK, PRODUCTS_MOCK, SIZE_CHARTS_MOCK } from "./products.mock";
 import {
   LeafCategory,
   Product,
   ProductResult,
   SaveMode,
   SaveProductPayload,
+  SizeChart,
+  SizeChartResult,
 } from "./products.types";
 
 type StockUpdate = { variantId: string; stock: number };
@@ -18,10 +20,13 @@ type ProductsStore = {
   loaded: boolean;
   products: Product[];
   categories: LeafCategory[];
+  /** The brand's size charts, shared by its products. */
+  sizeCharts: SizeChart[];
 
   fetchProducts: () => Promise<void>;
   saveProduct: (id: string | null, payload: SaveProductPayload, mode: SaveMode) => Promise<ProductResult>;
   updateStock: (stock: StockUpdate[], leadTimes: LeadTimeUpdate[]) => Promise<ProductResult>;
+  createSizeChart: (chart: Omit<SizeChart, "id">) => Promise<SizeChartResult>;
 };
 
 const nowIso = () => new Date().toISOString();
@@ -33,16 +38,18 @@ export const useProductsStore = create<ProductsStore>((set, get) => ({
   loaded: false,
   products: [],
   categories: [],
+  sizeCharts: [],
 
   fetchProducts: async () => {
     // Keep local edits for the session (mock data has no server to re-read from).
     if (get().loaded) return;
     set({ loading: true, error: null });
     try {
-      // TODO(api): const [products, categories] = await Promise.all([productsApi.list(), productsApi.leafCategories()]);
+      // TODO(api): const [products, categories, sizeCharts] = await Promise.all([productsApi.list(), productsApi.leafCategories(), productsApi.sizeCharts()]);
       set({
         products: PRODUCTS_MOCK,
         categories: LEAF_CATEGORIES_MOCK,
+        sizeCharts: SIZE_CHARTS_MOCK,
         loading: false,
         loaded: true,
       });
@@ -104,7 +111,9 @@ export const useProductsStore = create<ProductsStore>((set, get) => ({
       set({
         products: get().products.map((p) => ({
           ...p,
-          dispatchLeadTimeDays: leadById.get(p.id) ?? p.dispatchLeadTimeDays,
+          // The stock screen edits the longest dispatch time; "from" never goes above it.
+          dispatchMaxDays: leadById.get(p.id) ?? p.dispatchMaxDays,
+          dispatchMinDays: Math.min(p.dispatchMinDays, leadById.get(p.id) ?? p.dispatchMaxDays),
           variants: p.variants.map((v) =>
             stockById.has(v.id) ? { ...v, stock: stockById.get(v.id)! } : v,
           ),
@@ -115,6 +124,19 @@ export const useProductsStore = create<ProductsStore>((set, get) => ({
     } catch (e: any) {
       set({ saving: false });
       return { success: false, message: e?.response?.data?.message ?? "Could not update stock" };
+    }
+  },
+
+  createSizeChart: async (chart) => {
+    set({ saving: true });
+    try {
+      // TODO(api): POST /seller/size-charts { brandId, name, unit, columns, rows } -> data.id
+      const saved: SizeChart = { ...chart, id: `sc-${Date.now()}` };
+      set({ sizeCharts: [...get().sizeCharts, saved], saving: false });
+      return { success: true, message: "Size chart saved.", chart: saved };
+    } catch (e: any) {
+      set({ saving: false });
+      return { success: false, message: e?.response?.data?.message ?? "Could not save the size chart" };
     }
   },
 }));

@@ -1,5 +1,9 @@
 import { create } from "zustand";
 import { BRAND_PROFILE_MOCK } from "./brand-profile.mock";
+import { brandProfileFromOnboarding } from "./brand-profile.mapper";
+import { AUTH_BYPASS } from "@/features/auth/auth.mock";
+import { sellerProfileApi } from "@/features/seller-profile/seller-profile.api";
+import { normalizeProfile } from "@/features/seller-profile/seller-profile.helpers";
 import type { DocKey, UploadedDoc } from "@/features/onboarding/onboarding.types";
 import { MAX_OTHER_DOCS } from "@/features/onboarding/onboarding.helpers";
 import {
@@ -77,8 +81,17 @@ export const useBrandProfileStore = create<BrandProfileStore>((set, get) => {
       if (get().loaded) return;
       set({ loading: true, error: null });
       try {
-        // TODO(api): const res = await profileApi.get();
-        set({ profile: BRAND_PROFILE_MOCK, loading: false, loaded: true });
+        if (AUTH_BYPASS) {
+          set({ profile: BRAND_PROFILE_MOCK, loading: false, loaded: true });
+          return;
+        }
+        // Same data as the onboarding form: GET /seller/onboarding.
+        const res = await sellerProfileApi.get();
+        if (!res.status || !res.data) {
+          set({ error: res.message ?? "Could not load your brand profile.", loading: false });
+          return;
+        }
+        set({ profile: brandProfileFromOnboarding(normalizeProfile(res.data)), loading: false, loaded: true });
       } catch (e: any) {
         set({ error: e?.response?.data?.message ?? "Something went wrong", loading: false });
       }

@@ -118,6 +118,8 @@ export type SellerProfileResponse = {
       accountTitle: string | null;
       accountNumber: string | null;
       hasIban: boolean;
+      /** bankDetails.status, e.g. PENDING or VERIFIED. */
+      bankStatus: string | null;
     };
     brands: SavedBrand[];
     documents: SavedDocument[];
@@ -174,7 +176,7 @@ export type DocSlot = {
   size?: number;
   /** Picked on this page and not uploaded yet. */
   file?: File;
-  /** Signed link from GET /seller/onboarding; it expires after about 5 minutes. */
+  /** Link from GET /seller/onboarding; used only if the S3 base URL is not set. */
   url?: string;
 };
 

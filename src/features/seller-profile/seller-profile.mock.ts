@@ -37,7 +37,7 @@ export const SELLER_PROFILE_MOCK: SellerProfileResponse = {
     taxSaved: false,
     taxStatus: "UNREGISTERED",
     bankSaved: false,
-    onFile: { cnic: null, ntn: null, bankName: null, accountTitle: null, accountNumber: null, hasIban: false },
+    onFile: { cnic: null, ntn: null, bankName: null, accountTitle: null, accountNumber: null, bankStatus: null, hasIban: false },
     brands: [],
     documents: [],
     declaration: null,

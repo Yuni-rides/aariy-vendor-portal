@@ -1,4 +1,4 @@
-import { http, httpUpload } from "@/shared/api/http";
+import { httpUpload } from "@/shared/api/http";
 import { AUTH_BYPASS } from "@/features/auth/auth.mock";
 
 /**
@@ -124,24 +124,6 @@ export const mediaApi = {
     opts.onProgress?.(100);
     return results;
   },
-};
-
-/**
- * Link to open a file by its key.
- * Public files (brand logo, banner) are NEXT_PUBLIC_S3_BASE_URL + "/" + key, see fileUrl().
- * Private files (KYB documents) live in a private bucket: the S3 base URL gives 403, so ask
- * GET /media/url?key=... for a signed link. Signed links expire after a few minutes, so ask each time.
- */
-export const signedUrl = async (key: string): Promise<string> => {
-  if (/^(https?:|blob:|data:)/i.test(key)) return key;
-  if (AUTH_BYPASS) throw { response: { data: { message: "Files cannot be opened in test mode." } } };
-  const res = await http.get<ApiResult<any>>("/media/url", { params: { key } });
-  const d = res.data?.data;
-  const url = typeof d === "string" ? d : (d?.url ?? d?.signedUrl ?? d?.downloadUrl);
-  if (!res.data?.status || typeof url !== "string" || !url) {
-    throw { response: { data: { message: res.data?.message ?? "Could not open the file. Try again." } } };
-  }
-  return url;
 };
 
 /** Uploads one file and returns its key. */

@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { signedUrl, uploadErrorMessage } from "@/shared/api/media.api";
+import { useRef } from "react";
+import { fileUrl } from "@/shared/lib/file-url";
 import { toast } from "@/hooks/useToast";
 import { FileText, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,29 +25,16 @@ export function DocTile({
   onRemove?: () => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
-  const [opening, setOpening] = useState(false);
 
-  /** Opens the file in a new tab: a picked file locally, a saved one through a fresh signed link. */
-  const view = async () => {
+  /**
+   * Opens the file in a new tab: a picked file locally, a saved one at
+   * NEXT_PUBLIC_S3_BASE_URL + "/" + key (same as brand logo and banner).
+   */
+  const view = () => {
     if (!slot) return;
-    if (slot.file) {
-      window.open(URL.createObjectURL(slot.file), "_blank", "noopener");
-      return;
-    }
-    if (!slot.key) return;
-    // Open the tab now (inside the click) so the browser does not block it, then point it at the link.
-    const tab = window.open("", "_blank");
-    setOpening(true);
-    try {
-      const url = await signedUrl(slot.key);
-      if (tab) tab.location.href = url;
-      else window.open(url, "_blank", "noopener");
-    } catch (e) {
-      tab?.close();
-      toast({ title: uploadErrorMessage(e), variant: "destructive" });
-    } finally {
-      setOpening(false);
-    }
+    const url = slot.file ? URL.createObjectURL(slot.file) : fileUrl(slot.key) ?? slot.url ?? null;
+    if (url) window.open(url, "_blank", "noopener");
+    else toast({ title: "Could not open the file. Try again.", variant: "destructive" });
   };
   const input = (
     <input
@@ -78,8 +65,8 @@ export function DocTile({
             <span className="text-xs text-muted-foreground"> · Uploads when you save</span>
           )}
         </span>
-        <button type="button" className="cursor-pointer text-[13px] text-primary hover:underline disabled:opacity-60" disabled={opening} onClick={view}>
-          {opening ? "Opening..." : "View"}
+        <button type="button" className="cursor-pointer text-[13px] text-primary hover:underline" onClick={view}>
+          View
         </button>
         {!disabled && (
           <>
